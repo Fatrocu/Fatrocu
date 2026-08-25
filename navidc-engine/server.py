@@ -141,20 +141,45 @@ def fallback_rule_based_extraction(image: Image.Image, config: InvoiceConfigMode
         try:
             reader = get_easyocr_reader()
             if reader is not None:
-                results = reader.readtext(image)
+                import numpy as np
+                # EasyOCR expects numpy array or bytes, not PIL Image
+                img_np = np.array(image)
+                results = reader.readtext(img_np)
                 ocr_text = "\n".join([r[1] for r in results])
                 logger.info(f"EasyOCR extracted {len(ocr_text)} chars from {len(results)} text blocks")
         except Exception as ocr_err:
             logger.warning(f"All OCR engines failed: {ocr_err}")
             ocr_text = ""
 
-    # Common Turkish Invoice Patterns
-    fatura_no_match = re.search(r'(?:FATURA\s*(?:NO|NUMARASI)|F\.?\s*NO|INVOICE\s*NO)[\s:.\-#]*([A-Z0-9]{16}|[A-Z]{3}\d{13}|[A-Z0-9]{10,16})', ocr_text, re.IGNORECASE)
-    tarih_match = re.search(r'(?:TARİH|TARIH|DÜZENLEME\s*TARİHİ|DATE)[\s:.\-#]*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})', ocr_text, re.IGNORECASE)
-    vkn_match = re.search(r'(?:VKN|TCKN|VERGİ\s*NO|VERGI\s*NO)[\s:.\-#]*(\d{10,11})', ocr_text, re.IGNORECASE)
-    toplam_match = re.search(r'(?:ÖDENECEK\s*TUTAR|GENEL\s*TOPLAM|TOPLAM\s*TUTAR|TOPLAM|TOTAL)[\s:.\-#]*([0-9.,]+)\s*(?:TL|TRY|USD|EUR)?', ocr_text, re.IGNORECASE)
-    matrah_match = re.search(r'(?:KDV\s*MATRAHI|TOPLAM\s*MATRAH|MATRAH)[\s:.\-#]*([0-9.,]+)', ocr_text, re.IGNORECASE)
-    kdv_tutari_match = re.search(r'(?:KDV\s*TUTARI|TOPLAM\s*KDV|HESAPLANAN\s*KDV)[\s:.\-#]*([0-9.,]+)', ocr_text, re.IGNORECASE)
+    # Common Turkish Invoice Patterns (tolerant of OCR character substitution errors)
+    # Fatura No: match GIB format (16-char alphanumeric) anywhere after FATURA/F.NO label OR standalone on line
+    fatura_no_match = re.search(
+        r'(?:FATURA.{0,8}(?:NO|N[OQ0]|NUMARASI)|F\.?\s*NO|INVOICE\s*NO).{0,5}([A-Z0-9]{16})',
+        ocr_text, re.IGNORECASE
+    ) or re.search(r'\b([A-Z]{3}\d{13,16})\b', ocr_text)  # standalone GIB format
+
+    tarih_match = re.search(
+        r'(?:TAR[Iİ]H|D[UÜ]ZENLEME|DATE).{0,5}(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})',
+        ocr_text, re.IGNORECASE
+    )
+    vkn_match = re.search(
+        r'(?:VKN|TCKN|VERG[İI]\s*NO|VERGI\s*NO).{0,5}(\d{10,11})',
+        ocr_text, re.IGNORECASE
+    ) or re.search(r'\b(\d{10,11})\b', ocr_text)  # fallback: any 10-11 digit number
+
+    toplam_match = re.search(
+        r'(?:[OÖ]DENECEK\s*TUTAR|GENEL\s*TOPLAM|TOPLAM\s*TUTAR|TOPLAM|TOTAL).{0,10}?(\d[\d.,]+)',
+        ocr_text, re.IGNORECASE
+    )
+    matrah_match = re.search(
+        r'(?:KDV\s*MATRAHI|TOPLAM\s*MATRAH|MATRAH).{0,10}?(\d[\d.,]+)',
+        ocr_text, re.IGNORECASE
+    )
+    # KDV TUTARI — tolerant: TUTAPI, TUTARI, TUT4RI etc.
+    kdv_tutari_match = re.search(
+        r'(?:KDV\s*TUT.{1,4}|TOPLAM\s*KDV|HESAPLANAN\s*KDV).{0,10}?(\d[\d.,]+)',
+        ocr_text, re.IGNORECASE
+    )
 
     for f in config.fields:
         k = f.key
