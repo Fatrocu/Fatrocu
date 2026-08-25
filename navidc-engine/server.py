@@ -302,6 +302,51 @@ def run_navidc_inference(image: Image.Image, config: InvoiceConfigModel) -> Dict
     return fallback_rule_based_extraction(image, config)
 
 
+def convert_pdf_bytes_to_highres_image(pdf_bytes: bytes) -> Image.Image:
+    """Converts PDF bytes to a 300 DPI crisp RGB PIL Image, supporting multi-page stitching."""
+    rendered_images = []
+    try:
+        import fitz
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        for page in doc:
+            zoom = 300.0 / 72.0
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            rendered_images.append(img)
+            if len(rendered_images) >= 4:
+                break
+    except Exception as e1:
+        try:
+            import pypdfium2 as pdfium
+            pdf = pdfium.PdfDocument(pdf_bytes)
+            for page in pdf:
+                bitmap = page.render(scale=3.5)
+                pil_img = bitmap.to_pil().convert("RGB")
+                rendered_images.append(pil_img)
+                if len(rendered_images) >= 4:
+                    break
+        except Exception as e2:
+            logger.error(f"Failed to rasterize PDF: fitz({e1}), pdfium({e2})")
+            raise RuntimeError(f"PDF rasterization error: {e1} / {e2}")
+
+    if not rendered_images:
+        raise ValueError("Could not render any pages from PDF.")
+
+    if len(rendered_images) == 1:
+        return rendered_images[0]
+
+    max_w = max(img.width for img in rendered_images)
+    total_h = sum(img.height for img in rendered_images) + (len(rendered_images) - 1) * 20
+    final_image = Image.new("RGB", (max_w, total_h), (240, 240, 245))
+    current_y = 0
+    for img in rendered_images:
+        offset_x = (max_w - img.width) // 2
+        final_image.paste(img, (offset_x, current_y))
+        current_y += img.height + 20
+    return final_image
+
+
 if app:
     @app.get("/health")
     def health():
@@ -321,7 +366,10 @@ if app:
     async def extract_endpoint(payload: ExtractRequest):
         try:
             img_bytes = base64.b64decode(payload.image_base64)
-            image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+            if img_bytes.startswith(b"%PDF"):
+                image = convert_pdf_bytes_to_highres_image(img_bytes)
+            else:
+                image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
             result = run_navidc_inference(image, payload.config)
             return result
         except Exception as e:
@@ -337,7 +385,10 @@ if app:
             config_dict = json.loads(config_json)
             config = InvoiceConfigModel(**config_dict)
             contents = await file.read()
-            image = Image.open(io.BytesIO(contents)).convert("RGB")
+            if file.filename.lower().endswith(".pdf") or contents.startswith(b"%PDF"):
+                image = convert_pdf_bytes_to_highres_image(contents)
+            else:
+                image = Image.open(io.BytesIO(contents)).convert("RGB")
             result = run_navidc_inference(image, config)
             return result
         except Exception as e:
