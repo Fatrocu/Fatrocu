@@ -1,0 +1,33 @@
+# Node
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+
+# Rust
+target/
+src-tauri/target/
+**/*.rs.bk
+Cargo.lock
+
+# Python / NaviDC
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+*.egg-info/
+.pytest_cache/
+*.log
+
+# Windows / OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# User AppData / Cache
+*.tmp
+*.temp
