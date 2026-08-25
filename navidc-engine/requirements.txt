@@ -12,3 +12,5 @@ tqdm>=4.66.0
 requests>=2.31.0
 loguru>=0.7.2
 pypdfium2>=4.28.0
+pymupdf>=1.24.0
+easyocr>=1.7.0

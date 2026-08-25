@@ -12,13 +12,13 @@ flowchart TD
     subgraph RustCore ["Rust Core (Tauri 2.0)"]
         IPC[IPC Command Handlers]
         PDFRasterizer[PDF to Image Rasterizer]
-        DiskStorage[Disk Storage (%APPDATA%/Fatrocu)]
+        DiskStorage[Disk Storage]
         ExcelEngine[Native Excel & CSV Generator]
         SidecarManager[NaviDC-OCR Client & Sidecar Controller]
     end
 
     subgraph VLM ["Local AI Engine (NaviDC-OCR)"]
-        FastAPIServer[FastAPI REST Server (port 8765)]
+        FastAPIServer[FastAPI REST Server]
         VLMModel[StarDoc-AI/NaviDC-OCR 1.2B VLM]
         BBoxMapper[Grounded Coordinate Normalizer]
     end

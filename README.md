@@ -13,7 +13,7 @@
 
 ---
 
-## 🌟 Neler Değişti? (v2.x -> v3.0 Rust & NaviDC-OCR)
+## 🌟 Neler Değişti? (v2.2 -> v3.0 Rust & NaviDC-OCR)
 
 1. **Bulut API Bağımlılığı Kaldırıldı:** 
    - Google Gemini yerine tamamen yerel çalışan **NaviDC-OCR** (1.2B parametreli hafif Belge VLM'i) entegre edildi.

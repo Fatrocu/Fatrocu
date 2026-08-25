@@ -43,6 +43,20 @@ PROCESSOR_INSTANCE = None
 MODEL_NAME = os.environ.get("NAVIDC_MODEL_PATH", "StarDoc-AI/NaviDC-OCR")
 DEVICE = os.environ.get("NAVIDC_DEVICE", "cuda" if os.environ.get("CUDA_VISIBLE_DEVICES") != "-1" else "cpu")
 
+# EasyOCR lazy-loaded reader (cached after first use)
+_EASYOCR_READER = None
+
+def get_easyocr_reader():
+    global _EASYOCR_READER
+    if _EASYOCR_READER is None:
+        try:
+            import easyocr
+            _EASYOCR_READER = easyocr.Reader(['tr', 'en'], gpu=False)
+            logger.info("EasyOCR reader initialized (tr+en).")
+        except Exception as e:
+            logger.warning(f"EasyOCR not available: {e}")
+    return _EASYOCR_READER
+
 
 def load_navidc_model():
     global MODEL_LOADED, MODEL_INSTANCE, PROCESSOR_INSTANCE, DEVICE
@@ -122,13 +136,16 @@ def fallback_rule_based_extraction(image: Image.Image, config: InvoiceConfigMode
     try:
         import pytesseract
         ocr_text = pytesseract.image_to_string(image, lang="tur+eng")
+        logger.info(f"pytesseract OCR extracted {len(ocr_text)} chars")
     except Exception:
         try:
-            import easyocr
-            reader = easyocr.Reader(['tr', 'en'], gpu=False)
-            results = reader.readtext(image)
-            ocr_text = "\n".join([r[1] for r in results])
-        except Exception:
+            reader = get_easyocr_reader()
+            if reader is not None:
+                results = reader.readtext(image)
+                ocr_text = "\n".join([r[1] for r in results])
+                logger.info(f"EasyOCR extracted {len(ocr_text)} chars from {len(results)} text blocks")
+        except Exception as ocr_err:
+            logger.warning(f"All OCR engines failed: {ocr_err}")
             ocr_text = ""
 
     # Common Turkish Invoice Patterns
@@ -348,6 +365,26 @@ def convert_pdf_bytes_to_highres_image(pdf_bytes: bytes) -> Image.Image:
 
 
 if app:
+    @app.get("/")
+    def root():
+        return {
+            "app": "Fatrocu NaviDC-OCR Engine",
+            "version": "1.0.0",
+            "status": "running",
+            "endpoints": ["/health", "/load_model", "/extract", "/extract_file"],
+            "model_loaded": MODEL_LOADED
+        }
+
+    @app.on_event("startup")
+    async def on_startup():
+        """Pre-warm EasyOCR reader on server start so first extraction is fast."""
+        import threading
+        def warm_up():
+            logger.info("Pre-warming EasyOCR reader in background...")
+            get_easyocr_reader()
+            logger.info("EasyOCR warm-up complete.")
+        threading.Thread(target=warm_up, daemon=True).start()
+
     @app.get("/health")
     def health():
         return {
