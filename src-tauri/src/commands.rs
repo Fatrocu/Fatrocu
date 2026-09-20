@@ -1,8 +1,8 @@
 use crate::excel_export::ExcelExporter;
+use crate::llama_engine::LlamaEngine;
 use crate::models::{
     AppSettings, FileProcessingStatus, InvoiceConfig, ModelStatus, ProcessedInvoice, ReviewStatus,
 };
-use crate::navidc_client::NaviDCClient;
 use crate::pdf_converter::DocumentProcessor;
 use crate::storage::StorageManager;
 use log::{error, info};
@@ -12,8 +12,9 @@ use tauri::State;
 
 pub struct AppState {
     pub storage: Mutex<StorageManager>,
-    pub navidc: NaviDCClient,
 }
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub async fn get_app_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
@@ -30,6 +31,8 @@ pub async fn save_app_settings(
     storage.save_settings(&settings)
 }
 
+// ─── Configs ──────────────────────────────────────────────────────────────────
+
 #[tauri::command]
 pub async fn get_configs(state: State<'_, AppState>) -> Result<Vec<InvoiceConfig>, String> {
     let storage = state.storage.lock().map_err(|e| e.to_string())?;
@@ -44,6 +47,8 @@ pub async fn save_configs(
     let storage = state.storage.lock().map_err(|e| e.to_string())?;
     storage.save_configs(&configs)
 }
+
+// ─── Invoices ─────────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub async fn get_invoices(state: State<'_, AppState>) -> Result<Vec<ProcessedInvoice>, String> {
@@ -80,19 +85,18 @@ pub async fn clear_invoices(state: State<'_, AppState>) -> Result<(), String> {
     storage.save_invoices(&[])
 }
 
+// ─── Engine Status ────────────────────────────────────────────────────────────
+
 #[tauri::command]
-pub async fn check_navidc_status(state: State<'_, AppState>) -> Result<ModelStatus, String> {
+pub async fn check_engine_status(state: State<'_, AppState>) -> Result<ModelStatus, String> {
     let settings = {
         let storage = state.storage.lock().map_err(|e| e.to_string())?;
         storage.load_settings()
     };
-    Ok(state.navidc.check_status(&settings.navidc_url).await)
+    Ok(LlamaEngine::check_engine_status(&settings))
 }
 
-#[tauri::command]
-pub async fn start_navidc_server(state: State<'_, AppState>) -> Result<(), String> {
-    state.navidc.try_start_sidecar()
-}
+// ─── Main Processing Command ──────────────────────────────────────────────────
 
 #[tauri::command]
 pub async fn process_invoice_from_bytes(
@@ -103,9 +107,10 @@ pub async fn process_invoice_from_bytes(
     config: InvoiceConfig,
     state: State<'_, AppState>,
 ) -> Result<ProcessedInvoice, String> {
-    info!("Processing uploaded invoice bytes: {} ({})", file_name, config.name);
+    info!("İşleme başlandı: {} ({})", file_name, config.name);
 
-    let (raw_image_bytes, image_b64, data_url) =
+    // STEP 0: PDF → PNG veya görsel normalize
+    let (raw_image_bytes, _image_b64, data_url) =
         DocumentProcessor::process_bytes_to_image(&file_bytes, &file_name)?;
 
     let settings = {
@@ -113,16 +118,16 @@ pub async fn process_invoice_from_bytes(
         storage.load_settings()
     };
 
-    // Save image to AppData cache
+    // Görseli AppData'ya kaydet
     let saved_path_str = {
         let storage = state.storage.lock().map_err(|e| e.to_string())?;
         let saved_path = storage.save_image_file(&temp_id, "png", &raw_image_bytes)?;
         saved_path.to_string_lossy().to_string()
     };
 
-    // If manual config (no AI extraction), return empty ready for manual review
+    // Manuel şablon → AI pipeline atla
     if config.id == "predefined-manual" {
-        let invoice = ProcessedInvoice {
+        return Ok(ProcessedInvoice {
             id: temp_id,
             file_name,
             file_type,
@@ -137,20 +142,18 @@ pub async fn process_invoice_from_bytes(
             custom_fields: None,
             custom_line_item_fields: None,
             raw_ocr: None,
-            model_used: Some("Manual".to_string()),
+            raw_markdown: None,
+            ocr_model: None,
+            model_used: Some("Manuel".to_string()),
             created_at: Some(chrono::Local::now().to_rfc3339()),
-        };
-        return Ok(invoice);
+        });
     }
 
-    // Call NaviDC-OCR
-    match state
-        .navidc
-        .extract_invoice(&settings.navidc_url, &image_b64, &config)
-        .await
-    {
-        Ok((extracted_data, line_items, raw_ocr, model_used)) => {
-            let invoice = ProcessedInvoice {
+    // STEP 1+2: DeepSeek-OCR + Gemma 4 Pipeline
+    match LlamaEngine::run_full_pipeline(&raw_image_bytes, &config, &settings) {
+        Ok((extracted_data, line_items, raw_markdown, model_used)) => {
+            info!("Pipeline başarılı: {}", file_name);
+            Ok(ProcessedInvoice {
                 id: temp_id,
                 file_name,
                 file_type,
@@ -164,15 +167,16 @@ pub async fn process_invoice_from_bytes(
                 config_id: config.id,
                 custom_fields: None,
                 custom_line_item_fields: None,
-                raw_ocr,
+                raw_ocr: Some(raw_markdown.clone()),
+                raw_markdown: Some(raw_markdown),
+                ocr_model: Some("DeepSeek-OCR-GGUF".to_string()),
                 model_used: Some(model_used),
                 created_at: Some(chrono::Local::now().to_rfc3339()),
-            };
-            Ok(invoice)
+            })
         }
         Err(err) => {
-            error!("NaviDC extraction error: {}", err);
-            let invoice = ProcessedInvoice {
+            error!("Pipeline hatası [{}]: {}", file_name, err);
+            Ok(ProcessedInvoice {
                 id: temp_id,
                 file_name,
                 file_type,
@@ -187,13 +191,16 @@ pub async fn process_invoice_from_bytes(
                 custom_fields: None,
                 custom_line_item_fields: None,
                 raw_ocr: None,
+                raw_markdown: None,
+                ocr_model: None,
                 model_used: None,
                 created_at: Some(chrono::Local::now().to_rfc3339()),
-            };
-            Ok(invoice)
+            })
         }
     }
 }
+
+// ─── Export Commands ──────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub async fn export_invoices_excel(
@@ -233,6 +240,8 @@ pub async fn export_invoices_csv(
     Ok(out_path.to_string_lossy().to_string())
 }
 
+// ─── Utility Commands ─────────────────────────────────────────────────────────
+
 #[tauri::command]
 pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -248,4 +257,22 @@ pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn open_path(path: String) -> Result<(), String> {
     open::that(&path).map_err(|e| e.to_string())
+}
+
+/// Modeller için AppData/Fatrocu/models dizin yolunu döner
+#[tauri::command]
+pub async fn get_models_dir() -> Result<String, String> {
+    let dir = dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("Fatrocu")
+        .join("models");
+
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
+/// Belirli bir model dosyasının var olup olmadığını kontrol et
+#[tauri::command]
+pub async fn check_model_exists(file_path: String) -> bool {
+    std::path::Path::new(&file_path).exists()
 }

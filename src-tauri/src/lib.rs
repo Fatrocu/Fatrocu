@@ -1,12 +1,13 @@
 pub mod commands;
 pub mod excel_export;
+pub mod llama_engine;
 pub mod models;
-pub mod navidc_client;
 pub mod pdf_converter;
 pub mod storage;
 
+// navidc_client kaldırıldı — Faz 2: llama_engine kullanılıyor
+
 use commands::*;
-use navidc_client::NaviDCClient;
 use std::sync::Mutex;
 use storage::StorageManager;
 
@@ -15,13 +16,6 @@ pub fn run() {
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
     let storage_manager = StorageManager::new();
-    let navidc_client = NaviDCClient::new();
-
-    // Try auto-starting NaviDC sidecar if enabled in settings
-    let settings = storage_manager.load_settings();
-    if settings.auto_start_sidecar {
-        let _ = navidc_client.try_start_sidecar();
-    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -29,25 +23,31 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .manage(AppState {
             storage: Mutex::new(storage_manager),
-            navidc: navidc_client,
         })
         .invoke_handler(tauri::generate_handler![
+            // Settings
             get_app_settings,
             save_app_settings,
+            // Configs
             get_configs,
             save_configs,
+            // Invoices
             get_invoices,
             save_invoice,
             delete_invoice,
             clear_invoices,
-            check_navidc_status,
-            start_navidc_server,
+            // Engine / Pipeline
+            check_engine_status,
             process_invoice_from_bytes,
+            // Export
             export_invoices_excel,
             export_invoices_csv,
+            // Utilities
             reveal_in_explorer,
             open_path,
+            get_models_dir,
+            check_model_exists,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running fatrocu tauri application");
+        .expect("Fatrocu uygulama başlatılamadı.");
 }

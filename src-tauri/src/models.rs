@@ -1,12 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// ─── Processing & Review Status ───────────────────────────────────────────────
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum FileProcessingStatus {
     Idle,
     Queued,
-    Uploading,
     Processing,
     Success,
     Error,
@@ -18,6 +19,8 @@ pub enum ReviewStatus {
     Pending,
     Reviewed,
 }
+
+// ─── Data Primitives ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -53,6 +56,8 @@ pub struct InvoiceConfig {
 pub type ExtractedInvoiceFields = HashMap<String, GroundedValue>;
 pub type LineItem = HashMap<String, GroundedValue>;
 
+// ─── Processed Invoice ────────────────────────────────────────────────────────
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessedInvoice {
@@ -69,34 +74,51 @@ pub struct ProcessedInvoice {
     pub config_id: String,
     pub custom_fields: Option<Vec<FieldConfig>>,
     pub custom_line_item_fields: Option<Vec<FieldConfig>>,
-    pub raw_ocr: Option<String>,
-    pub model_used: Option<String>,
+    pub raw_ocr: Option<String>,      // DeepSeek-OCR markdown çıktısı
+    pub raw_markdown: Option<String>, // alias (backward compat)
+    pub ocr_model: Option<String>,    // hangi OCR modeli kullanıldı
+    pub model_used: Option<String>,   // Gemma extraction modeli
     pub created_at: Option<String>,
 }
+
+// ─── App Settings — Yeni Pipeline Şeması ─────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
-    pub navidc_url: String,
-    pub auto_start_sidecar: bool,
-    pub device: String, // "cuda" or "cpu"
-    pub model_path: String,
+    // DeepSeek-OCR (GGUF) — llama.cpp ile çalışır
+    pub ocr_model_path: String,
+    pub ocr_threads: u32,
+    pub ocr_gpu_layers: u32,
+
+    // Gemma 4 (GGUF) — alan çıkarma asistanı
+    pub extraction_model_id: String,   // "E2B" | "E4B" | "12B" | "custom"
+    pub extraction_model_path: String,
+    pub extraction_threads: u32,
+    pub extraction_gpu_layers: u32,
+
+    // Genel
     pub save_processed_files: bool,
-    pub default_export_format: String, // "xlsx" or "csv"
+    pub default_export_format: String, // "xlsx" | "csv"
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            navidc_url: "http://127.0.0.1:8765".to_string(),
-            auto_start_sidecar: true,
-            device: "cuda".to_string(),
-            model_path: "StarDoc-AI/NaviDC-OCR".to_string(),
+            ocr_model_path: String::new(),
+            ocr_threads: 4,
+            ocr_gpu_layers: 0,
+            extraction_model_id: "E4B".to_string(),
+            extraction_model_path: String::new(),
+            extraction_threads: 4,
+            extraction_gpu_layers: 0,
             save_processed_files: true,
             default_export_format: "xlsx".to_string(),
         }
     }
 }
+
+// ─── Engine/Model Status ──────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,4 +128,17 @@ pub struct ModelStatus {
     pub model_loaded: bool,
     pub device: String,
     pub message: String,
+}
+
+// ─── Download Progress ────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadProgress {
+    pub model_id: String,
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub percent: f32,
+    pub done: bool,
+    pub error: Option<String>,
 }

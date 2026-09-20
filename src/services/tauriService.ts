@@ -1,16 +1,28 @@
+/**
+ * tauriService.ts — Fatrocu Faz 2
+ * Tauri IPC komutlarını çağırır. Web modunda (Tauri dışı) stub döner.
+ * Pipeline: görsel/PDF → DeepSeek-OCR (markdown) → Gemma 4 (JSON)
+ */
+
 import { invoke } from '@tauri-apps/api/core';
-import { AppSettings, InvoiceConfig, ModelStatus, ProcessedInvoice } from '../types';
+import {
+  AppSettings,
+  InvoiceConfig,
+  ProcessedInvoice,
+  ModelStatus,
+  FileProcessingStatus,
+  GemmaVariant,
+} from '../types';
 import { PREDEFINED_CONFIGS } from './configService';
 
-export const isTauri = () =>
-  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+// ─── Tauri Ortam Tespiti ───────────────────────────────────────────────────────
+const IS_TAURI = typeof (window as any).__TAURI_INTERNALS__ !== 'undefined';
 
-// ─── In-memory fallback for browser dev mode ─────────────────────────────────
-let fallbackSettings: AppSettings = {
+const DEFAULT_SETTINGS: AppSettings = {
   ocrModelPath: '',
   ocrThreads: 4,
   ocrGpuLayers: 0,
-  extractionModelId: 'E4B',
+  extractionModelId: 'E4B' as GemmaVariant,
   extractionModelPath: '',
   extractionThreads: 4,
   extractionGpuLayers: 0,
@@ -18,169 +30,202 @@ let fallbackSettings: AppSettings = {
   defaultExportFormat: 'xlsx',
 };
 
-let fallbackConfigs: InvoiceConfig[] = [...PREDEFINED_CONFIGS];
-let fallbackInvoices: ProcessedInvoice[] = [];
+// ─── Helper — File → Base64 bytes array ───────────────────────────────────────
+async function fileToUint8Array(file: File): Promise<number[]> {
+  const ab = await file.arrayBuffer();
+  return Array.from(new Uint8Array(ab));
+}
 
-export const tauriService = {
-  // ── Settings ──────────────────────────────────────────────────────────────
-  async getAppSettings(): Promise<AppSettings> {
-    if (isTauri()) return await invoke<AppSettings>('get_app_settings');
-    const stored = localStorage.getItem('fatrocu_settings');
-    return stored ? JSON.parse(stored) : fallbackSettings;
-  },
+// ─── TauriService ─────────────────────────────────────────────────────────────
+class TauriService {
+
+  // ── Settings ─────────────────────────────────────────────────────────────────
+  async getAppSettings(): Promise<AppSettings | null> {
+    if (!IS_TAURI) return DEFAULT_SETTINGS;
+    try {
+      return await invoke<AppSettings>('get_app_settings');
+    } catch (e) {
+      console.error('getAppSettings error:', e);
+      return DEFAULT_SETTINGS;
+    }
+  }
 
   async saveAppSettings(settings: AppSettings): Promise<void> {
-    if (isTauri()) { await invoke('save_app_settings', { settings }); return; }
-    fallbackSettings = settings;
-    localStorage.setItem('fatrocu_settings', JSON.stringify(settings));
-  },
+    if (!IS_TAURI) return;
+    await invoke('save_app_settings', { settings });
+  }
 
-  // ── Configs ───────────────────────────────────────────────────────────────
+  // ── Configs ───────────────────────────────────────────────────────────────────
   async getConfigs(): Promise<InvoiceConfig[]> {
-    if (isTauri()) {
+    if (!IS_TAURI) return PREDEFINED_CONFIGS;
+    try {
       const configs = await invoke<InvoiceConfig[]>('get_configs');
-      if (!configs || configs.length === 0) {
-        await invoke('save_configs', { configs: PREDEFINED_CONFIGS });
-        return PREDEFINED_CONFIGS;
-      }
-      return configs;
+      return configs && configs.length > 0 ? configs : PREDEFINED_CONFIGS;
+    } catch {
+      return PREDEFINED_CONFIGS;
     }
-    const stored = localStorage.getItem('fatrocu_configs');
-    return stored ? JSON.parse(stored) : fallbackConfigs;
-  },
+  }
 
   async saveConfigs(configs: InvoiceConfig[]): Promise<void> {
-    if (isTauri()) { await invoke('save_configs', { configs }); return; }
-    fallbackConfigs = configs;
-    localStorage.setItem('fatrocu_configs', JSON.stringify(configs));
-  },
+    if (!IS_TAURI) return;
+    await invoke('save_configs', { configs });
+  }
 
-  // ── Invoices ──────────────────────────────────────────────────────────────
+  // ── Invoices ──────────────────────────────────────────────────────────────────
   async getInvoices(): Promise<ProcessedInvoice[]> {
-    if (isTauri()) return await invoke<ProcessedInvoice[]>('get_invoices');
-    const stored = localStorage.getItem('fatrocu_invoices');
-    return stored ? JSON.parse(stored) : fallbackInvoices;
-  },
+    if (!IS_TAURI) return [];
+    try {
+      return await invoke<ProcessedInvoice[]>('get_invoices');
+    } catch {
+      return [];
+    }
+  }
 
   async saveInvoice(invoice: ProcessedInvoice): Promise<void> {
-    if (isTauri()) { await invoke('save_invoice', { invoice }); return; }
-    const idx = fallbackInvoices.findIndex((i) => i.id === invoice.id);
-    if (idx >= 0) fallbackInvoices[idx] = invoice;
-    else fallbackInvoices.push(invoice);
-    localStorage.setItem('fatrocu_invoices', JSON.stringify(fallbackInvoices));
-  },
+    if (!IS_TAURI) return;
+    await invoke('save_invoice', { invoice });
+  }
 
   async deleteInvoice(invoiceId: string): Promise<void> {
-    if (isTauri()) { await invoke('delete_invoice', { invoiceId }); return; }
-    fallbackInvoices = fallbackInvoices.filter((i) => i.id !== invoiceId);
-    localStorage.setItem('fatrocu_invoices', JSON.stringify(fallbackInvoices));
-  },
+    if (!IS_TAURI) return;
+    await invoke('delete_invoice', { invoiceId });
+  }
 
   async clearInvoices(): Promise<void> {
-    if (isTauri()) { await invoke('clear_invoices'); return; }
-    fallbackInvoices = [];
-    localStorage.removeItem('fatrocu_invoices');
-  },
+    if (!IS_TAURI) return;
+    await invoke('clear_invoices');
+  }
 
-  // ── Engine Status (Faz 1: stub, Faz 2: llama.cpp integration) ────────────
-  async checkEngineStatus(): Promise<ModelStatus> {
-    if (isTauri()) {
-      try {
-        return await invoke<ModelStatus>('check_engine_status');
-      } catch {
-        // command not yet implemented in Faz 1
-      }
+  // ── Engine Status ─────────────────────────────────────────────────────────────
+  async checkEngineStatus(): Promise<ModelStatus | null> {
+    if (!IS_TAURI) {
+      // Web stub — llama.cpp binary yoktur
+      return {
+        online: false,
+        modelName: 'Web Geliştirme Modu',
+        modelLoaded: false,
+        device: '—',
+        message: 'Tauri uygulaması dışında pipeline çalışmaz.',
+      };
     }
-    return {
-      online: false,
-      modelName: 'DeepSeek-OCR + Gemma 4',
-      modelLoaded: false,
-      device: 'CPU',
-      message: 'Motor Faz 2\'de entegre edilecek.',
-    };
-  },
+    try {
+      return await invoke<ModelStatus>('check_engine_status');
+    } catch (e) {
+      return {
+        online: false,
+        modelName: 'Motor durumu alınamadı',
+        modelLoaded: false,
+        device: '—',
+        message: String(e),
+      };
+    }
+  }
 
-  // ── Processing ────────────────────────────────────────────────────────────
+  // ── Ana Pipeline İşleme ───────────────────────────────────────────────────────
+  /**
+   * Bir fatura dosyasını (PDF veya görsel) işler.
+   * Sıra:
+   *   1. File → Uint8Array (frontend)
+   *   2. Rust: process_invoice_from_bytes
+   *      → DocumentProcessor: PDF → 300 DPI PNG
+   *      → LlamaEngine: DeepSeek-OCR (markdown) → Gemma 4 (JSON)
+   *   3. ProcessedInvoice döner
+   */
   async processInvoiceFile(
     file: File,
     tempId: string,
     config: InvoiceConfig
   ): Promise<ProcessedInvoice> {
-    const arrayBuffer = await file.arrayBuffer();
-    const bytes = Array.from(new Uint8Array(arrayBuffer));
-
-    if (isTauri()) {
-      return await invoke<ProcessedInvoice>('process_invoice_from_bytes', {
-        tempId,
-        fileBytes: bytes,
-        fileName: file.name,
-        fileType: file.type || 'application/octet-stream',
-        config,
-      });
+    if (!IS_TAURI) {
+      // Web geliştirme stub'u
+      return this._webStubInvoice(file, tempId, config);
     }
 
-    // Browser dev-mode stub
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          id: tempId,
-          fileName: file.name,
-          fileType: file.type,
-          status: 'success' as any,
-          reviewStatus: 'pending',
-          configId: config.id,
-          extractedData: {
-            faturaNumarasi:  { value: 'GIB2026000012345678' },
-            faturaTarihi:    { value: '20.09.2026' },
-            genelToplam:     { value: '1.450,00 TL' },
-            saticiUnvan:     { value: 'ÖRNEK TİCARET A.Ş.' },
-            saticiVknTckn:   { value: '1234567890' },
-            kdvMatrahi:      { value: '1.208,33 TL' },
-            kdvTutari:       { value: '241,67 TL' },
-          },
-          lineItems: [
-            {
-              kdvOrani:   { value: '%20' },
-              kdvMatrahi: { value: '1.208,33' },
-              kdvTutari:  { value: '241,67' },
-            },
-          ],
-          ocrModel: 'DeepSeek-OCR (stub)',
-          modelUsed: 'Gemma-4-E4B (stub)',
-          createdAt: new Date().toISOString(),
-        });
-      }, 900);
-    });
-  },
+    const fileBytes = await fileToUint8Array(file);
 
-  // ── Export ────────────────────────────────────────────────────────────────
+    const result = await invoke<ProcessedInvoice>('process_invoice_from_bytes', {
+      tempId,
+      fileBytes,
+      fileName: file.name,
+      fileType: file.type || 'application/octet-stream',
+      config,
+    });
+
+    return result;
+  }
+
+  // ── Export ────────────────────────────────────────────────────────────────────
   async exportInvoicesExcel(
     invoices: ProcessedInvoice[],
-    configs: InvoiceConfig[],
-    targetPath?: string
+    configs: InvoiceConfig[]
   ): Promise<string> {
-    if (isTauri()) {
-      return await invoke<string>('export_invoices_excel', { invoices, configs, targetPath });
-    }
-    return 'Tauri dışında Excel kaydı desteklenmiyor.';
-  },
+    if (!IS_TAURI) throw new Error('Export yalnızca Tauri uygulamasında çalışır.');
+    return await invoke<string>('export_invoices_excel', {
+      invoices,
+      configs,
+      targetPath: null,
+    });
+  }
 
   async exportInvoicesCsv(
     invoices: ProcessedInvoice[],
-    configs: InvoiceConfig[],
-    targetPath?: string
+    configs: InvoiceConfig[]
   ): Promise<string> {
-    if (isTauri()) {
-      return await invoke<string>('export_invoices_csv', { invoices, configs, targetPath });
-    }
-    return 'Tauri dışında CSV kaydı desteklenmiyor.';
-  },
+    if (!IS_TAURI) throw new Error('Export yalnızca Tauri uygulamasında çalışır.');
+    return await invoke<string>('export_invoices_csv', {
+      invoices,
+      configs,
+      targetPath: null,
+    });
+  }
 
+  // ── Utility ───────────────────────────────────────────────────────────────────
   async revealInExplorer(path: string): Promise<void> {
-    if (isTauri()) await invoke('reveal_in_explorer', { path });
-  },
+    if (!IS_TAURI) return;
+    await invoke('reveal_in_explorer', { path });
+  }
 
   async openPath(path: string): Promise<void> {
-    if (isTauri()) await invoke('open_path', { path });
-  },
-};
+    if (!IS_TAURI) return;
+    await invoke('open_path', { path });
+  }
+
+  async getModelsDir(): Promise<string> {
+    if (!IS_TAURI) return '';
+    return await invoke<string>('get_models_dir');
+  }
+
+  async checkModelExists(filePath: string): Promise<boolean> {
+    if (!IS_TAURI) return false;
+    return await invoke<boolean>('check_model_exists', { filePath });
+  }
+
+  // ── Web Dev Stub ──────────────────────────────────────────────────────────────
+  private _webStubInvoice(
+    file: File,
+    tempId: string,
+    config: InvoiceConfig
+  ): ProcessedInvoice {
+    const fields: Record<string, any> = {};
+    config.fields.forEach((f) => {
+      fields[f.key] = { value: `[WEB STUB] ${f.label}` };
+    });
+
+    return {
+      id: tempId,
+      fileName: file.name,
+      fileType: file.type,
+      status: FileProcessingStatus.SUCCESS,
+      reviewStatus: 'pending',
+      extractedData: fields,
+      lineItems: [],
+      configId: config.id,
+      rawOcr: '[Web modu — DeepSeek-OCR pipeline çalışmıyor]',
+      ocrModel: 'stub',
+      modelUsed: 'stub',
+      createdAt: new Date().toISOString(),
+    };
+  }
+}
+
+export const tauriService = new TauriService();
