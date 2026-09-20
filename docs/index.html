@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fatrocu — Akıllı Fatura İşleme</title>
+  <meta name="description" content="Fatrocu v3.0 — %100 yerel, bulut bağımlılığı olmadan AI destekli fatura işleme. Rust + Tauri + llama.cpp ile güçlendirilmiş." />
+  <style>
+    /* ─── RESET & BASE ────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black: #000000;
+      --white: #ffffff;
+      --gray-100: #f5f5f5;
+      --gray-200: #e8e8e8;
+      --gray-400: #a0a0a0;
+      --gray-600: #555555;
+      --shadow-sm: 2px 2px 0 #000;
+      --shadow-md: 4px 4px 0 #000;
+      --shadow-lg: 6px 6px 0 #000;
+      --radius: 0px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background: var(--white);
+      color: var(--black);
+      line-height: 1.6;
+    }
+
+    /* ─── FONTS (loaded from system, fallback to mono) ── */
+    h1, h2, h3, h4, .label {
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+    }
+
+    /* ─── SCRIBBLE UTILITY ────────────────────────────── */
+    .scribble-border {
+      border: 2.5px solid var(--black);
+      box-shadow: var(--shadow-md);
+    }
+
+    .scribble-border-heavy {
+      border: 3px solid var(--black);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border: 2.5px solid var(--black);
+      background: var(--black);
+      color: var(--white);
+      font-family: 'Courier New', monospace;
+      font-weight: 900;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-decoration: none;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.08s, box-shadow 0.08s;
+    }
+    .btn:hover { transform: translate(-1px,-1px); box-shadow: var(--shadow-md); }
+    .btn:active { transform: translate(1px,1px); box-shadow: none; }
+
+    .btn-outline {
+      background: var(--white);
+      color: var(--black);
+    }
+
+    /* ─── NAV ─────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--black);
+      color: var(--white);
+      padding: 0 5vw;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      border-bottom: 3px solid var(--black);
+    }
+
+    .nav-logo {
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: var(--white);
+      text-decoration: none;
+      letter-spacing: 0.12em;
+    }
+    .nav-logo span { opacity: 0.5; }
+
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--white);
+      text-decoration: none;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      opacity: 0.75;
+      transition: opacity 0.15s;
+    }
+    .nav-links a:hover { opacity: 1; }
+
+    /* ─── HERO ────────────────────────────────────────── */
+    .hero {
+      min-height: calc(100vh - 56px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 5vw;
+      background:
+        repeating-linear-gradient(
+          0deg, transparent, transparent 39px,
+          rgba(0,0,0,0.04) 39px, rgba(0,0,0,0.04) 40px
+        ),
+        repeating-linear-gradient(
+          90deg, transparent, transparent 39px,
+          rgba(0,0,0,0.04) 39px, rgba(0,0,0,0.04) 40px
+        );
+    }
+
+    .hero-ascii {
+      font-size: clamp(0.45rem, 1.5vw, 0.75rem);
+      line-height: 1.4;
+      margin-bottom: 40px;
+      opacity: 0.12;
+      white-space: pre;
+      font-weight: 700;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.8rem, 7vw, 5.5rem);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .hero h1 .version {
+      display: inline-block;
+      font-size: 1.1rem;
+      vertical-align: super;
+      background: var(--black);
+      color: var(--white);
+      padding: 2px 10px;
+      margin-left: 8px;
+      border-radius: 2px;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--gray-600);
+      margin: 20px 0 40px;
+      max-width: 620px;
+    }
+
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 48px;
+    }
+
+    .badge {
+      padding: 6px 14px;
+      border: 2px solid var(--black);
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: var(--white);
+    }
+
+    .badge.filled {
+      background: var(--black);
+      color: var(--white);
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .hero-stat-row {
+      display: flex;
+      gap: 40px;
+      margin-top: 80px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .hero-stat {
+      text-align: center;
+    }
+
+    .hero-stat .num {
+      font-size: 2.5rem;
+      font-weight: 900;
+      display: block;
+    }
+
+    .hero-stat .lbl {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--gray-600);
+    }
+
+    /* ─── SECTION ─────────────────────────────────────── */
+    section {
+      padding: 100px 5vw;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    section.full-width {
+      max-width: 100%;
+      background: var(--gray-100);
+      padding: 80px 5vw;
+    }
+
+    .section-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--gray-400);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-label::before {
+      content: "✦";
+      font-size: 0.9rem;
+      color: var(--black);
+    }
+
+    .section-title {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .section-desc {
+      font-size: 1rem;
+      color: var(--gray-600);
+      max-width: 600px;
+      margin-bottom: 56px;
+    }
+
+    /* ─── PIPELINE DIAGRAM ────────────────────────────── */
+    .pipeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pipe-step {
+      flex: 1;
+      min-width: 160px;
+      border: 2.5px solid var(--black);
+      padding: 24px 20px;
+      background: var(--white);
+      box-shadow: var(--shadow-sm);
+      position: relative;
+    }
+
+    .pipe-arrow {
+      font-size: 1.5rem;
+      font-weight: 900;
+      padding: 0 8px;
+      color: var(--black);
+      flex-shrink: 0;
+    }
+
+    .pipe-step .pipe-icon {
+      font-size: 1.6rem;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .pipe-step .pipe-title {
+      font-size: 0.75rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .pipe-step .pipe-desc {
+      font-size: 0.72rem;
+      color: var(--gray-600);
+    }
+
+    .pipe-step .pipe-tag {
+      display: inline-block;
+      background: var(--black);
+      color: var(--white);
+      font-size: 0.6rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      margin-top: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* ─── FEATURE GRID ────────────────────────────────── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .feature-card {
+      border: 2.5px solid var(--black);
+      padding: 32px 28px;
+      background: var(--white);
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.08s, box-shadow 0.08s;
+    }
+    .feature-card:hover {
+      transform: translate(-2px,-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .feature-title {
+      font-size: 1rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+
+    .feature-desc {
+      font-size: 0.85rem;
+      color: var(--gray-600);
+      line-height: 1.6;
+    }
+
+    /* ─── INSTALL STEPS ───────────────────────────────── */
+    .install-steps {
+      counter-reset: step;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .install-step {
+      counter-increment: step;
+      border: 2.5px solid var(--black);
+      padding: 28px 28px 28px 80px;
+      background: var(--white);
+      box-shadow: var(--shadow-sm);
+      position: relative;
+    }
+
+    .install-step::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 56px;
+      background: var(--black);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      font-weight: 900;
+    }
+
+    .install-step h4 {
+      font-size: 0.95rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .install-step p, .install-step ul {
+      font-size: 0.85rem;
+      color: var(--gray-600);
+      line-height: 1.6;
+    }
+
+    .install-step ul { padding-left: 20px; margin-top: 6px; }
+
+    .install-step a {
+      color: var(--black);
+      font-weight: 800;
+    }
+
+    /* ─── MODEL TABLE ─────────────────────────────────── */
+    .model-table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    thead th {
+      background: var(--black);
+      color: var(--white);
+      padding: 14px 20px;
+      text-align: left;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 900;
+    }
+
+    tbody td {
+      padding: 14px 20px;
+      border-bottom: 2px solid var(--black);
+      vertical-align: top;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    tbody tr:nth-child(even) td { background: var(--gray-100); }
+
+    td a {
+      color: var(--black);
+      font-weight: 800;
+    }
+
+    /* ─── CODE BLOCK ──────────────────────────────────── */
+    pre, code {
+      font-family: 'Courier New', monospace;
+    }
+
+    pre {
+      background: var(--black);
+      color: #d4d4d4;
+      padding: 28px 32px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      border: 2.5px solid var(--black);
+      box-shadow: var(--shadow-md);
+    }
+
+    pre .cm { color: #6a9955; }
+    pre .kw { color: #c586c0; }
+    pre .st { color: #ce9178; }
+
+    /* ─── TEMPLATE SECTION ────────────────────────────── */
+    .template-demo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+
+    @media (max-width: 720px) {
+      .template-demo { grid-template-columns: 1fr; }
+    }
+
+    .template-fields {
+      border: 2.5px solid var(--black);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .template-fields-header {
+      background: var(--black);
+      color: var(--white);
+      padding: 14px 20px;
+      font-size: 0.75rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .template-field-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      border-bottom: 1.5px solid var(--gray-200);
+      font-size: 0.82rem;
+    }
+    .template-field-row:last-child { border-bottom: none; }
+
+    .field-key {
+      font-weight: 800;
+      font-family: 'Courier New', monospace;
+    }
+
+    .field-label {
+      color: var(--gray-600);
+      font-size: 0.78rem;
+    }
+
+    /* ─── TROUBLESHOOT ────────────────────────────────── */
+    .trouble-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .trouble-item {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 2.5px solid var(--black);
+      box-shadow: var(--shadow-sm);
+    }
+
+    @media (max-width: 680px) {
+      .trouble-item { grid-template-columns: 1fr; }
+    }
+
+    .trouble-problem {
+      padding: 20px 24px;
+      background: var(--black);
+      color: var(--white);
+      font-size: 0.82rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .trouble-problem::before { content: "✕"; opacity: 0.5; font-size: 1rem; }
+
+    .trouble-solution {
+      padding: 20px 24px;
+      background: var(--white);
+      font-size: 0.82rem;
+      color: var(--gray-600);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .trouble-solution::before { content: "→"; font-weight: 900; color: var(--black); font-size: 1rem; }
+
+    /* ─── ARCHITECTURE ────────────────────────────────── */
+    .arch-box {
+      border: 2.5px solid var(--black);
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+
+    .arch-header {
+      background: var(--black);
+      color: var(--white);
+      padding: 16px 24px;
+      font-size: 0.75rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .arch-body {
+      padding: 32px;
+      font-size: 0.82rem;
+    }
+
+    .arch-layer {
+      border: 2px solid var(--black);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .arch-layer-title {
+      background: var(--gray-100);
+      border-bottom: 2px solid var(--black);
+      padding: 8px 16px;
+      font-size: 0.72rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .arch-layer-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+    }
+
+    .arch-item {
+      padding: 10px 16px;
+      border-right: 1.5px solid var(--gray-200);
+      font-size: 0.78rem;
+      font-family: 'Courier New', monospace;
+    }
+    .arch-item:last-child { border-right: none; }
+
+    .arch-arrow {
+      text-align: center;
+      font-size: 1.2rem;
+      padding: 4px 0;
+      font-weight: 900;
+      color: var(--gray-400);
+    }
+
+    /* ─── FOOTER ──────────────────────────────────────── */
+    footer {
+      background: var(--black);
+      color: var(--white);
+      padding: 60px 5vw;
+      text-align: center;
+    }
+
+    .footer-logo {
+      font-size: 1.5rem;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      margin-bottom: 16px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+
+    .footer-links a {
+      color: rgba(255,255,255,0.6);
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      transition: color 0.15s;
+    }
+    .footer-links a:hover { color: var(--white); }
+
+    .footer-copy {
+      color: rgba(255,255,255,0.35);
+      font-size: 0.75rem;
+    }
+
+    /* ─── RESPONSIVE ──────────────────────────────────── */
+    @media (max-width: 680px) {
+      .nav-links { display: none; }
+      .pipeline { flex-direction: column; }
+      .pipe-arrow { transform: rotate(90deg); }
+      .hero-stat-row { gap: 24px; }
+    }
+
+    /* ─── SCROLL REVEAL ───────────────────────────────── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* ─── DASHED DIVIDER ──────────────────────────────── */
+    hr {
+      border: none;
+      border-top: 2px dashed var(--gray-200);
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a class="nav-logo" href="#"><span>✦</span> FATROCU</a>
+    <ul class="nav-links">
+      <li><a href="#nedir">Nedir</a></li>
+      <li><a href="#kurulum">Kurulum</a></li>
+      <li><a href="#kullanim">Kullanım</a></li>
+      <li><a href="#sablonlar">Şablonlar</a></li>
+      <li><a href="#derleme">Derleme</a></li>
+      <li><a href="#sorunlar">Sorunlar</a></li>
+      <li><a href="https://github.com/Nec0ti/Fatrocu" target="_blank">GitHub ↗</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <pre class="hero-ascii">
+ ___  ____  ____  ____  ____  ___  _  _
+/ __)( ___)( ___)( ___)(  _ \/ _ \/ )( \
+\__ \ )__)  )__)  )__)  )   ( (_) ) \/ (
+(___/(____)(____)(____)(_)\_)\___/ \____/
+    </pre>
+
+    <h1>FATROCU<span class="version">v3.0</span></h1>
+    <p class="hero-subtitle">
+      Yapay zeka destekli, %100 yerel fatura işleme sistemi.<br />
+      Bulut yok. API maliyeti yok. Veri gizliliği tam.
+    </p>
+
+    <div class="hero-badges">
+      <span class="badge filled">Rust + Tauri 2.0</span>
+      <span class="badge">llama.cpp</span>
+      <span class="badge">DeepSeek-OCR</span>
+      <span class="badge">Gemma 4 GGUF</span>
+      <span class="badge">Windows x64</span>
+      <span class="badge filled">%100 Yerel</span>
+    </div>
+
+    <div class="hero-cta">
+      <a class="btn" href="https://github.com/Nec0ti/Fatrocu/releases/latest" target="_blank">
+        ↓ İndir — v3.0
+      </a>
+      <a class="btn btn-outline" href="https://github.com/Nec0ti/Fatrocu" target="_blank">
+        ★ GitHub
+      </a>
+    </div>
+
+    <div class="hero-stat-row">
+      <div class="hero-stat">
+        <span class="num">%100</span>
+        <span class="lbl">Yerel Çalışma</span>
+      </div>
+      <div class="hero-stat">
+        <span class="num">0₺</span>
+        <span class="lbl">API Maliyeti</span>
+      </div>
+      <div class="hero-stat">
+        <span class="num">2 AI</span>
+        <span class="lbl">Aşamalı Pipeline</span>
+      </div>
+      <div class="hero-stat">
+        <span class="num">∞</span>
+        <span class="lbl">Fatura Şablonu</span>
+      </div>
+    </div>
+  </div>
+
+  <hr />
+
+  <!-- NEDİR -->
+  <section id="nedir">
+    <div class="section-label">Genel Bakış</div>
+    <h2 class="section-title">Fatrocu Nedir?</h2>
+    <p class="section-desc">
+      Fatrocu; PDF ve görüntü faturalarınızı iki aşamalı bir AI pipeline ile otomatik olarak okuyan,
+      alanları çıkaran ve Excel/CSV olarak dışa aktaran bir Windows masaüstü uygulamasıdır.
+    </p>
+
+    <!-- Pipeline -->
+    <div class="pipeline reveal">
+      <div class="pipe-step">
+        <span class="pipe-icon">📄</span>
+        <div class="pipe-title">Giriş</div>
+        <div class="pipe-desc">PDF, PNG, JPG fatura dosyası yüklenir. PDF ise her sayfa 300 DPI PNG'ye dönüştürülür.</div>
+        <span class="pipe-tag">PDF → PNG</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <span class="pipe-icon">👁️</span>
+        <div class="pipe-title">OCR Adımı</div>
+        <div class="pipe-desc">DeepSeek-OCR GGUF modeli görüntüyü okur ve tabloları koruyarak ham Markdown çıktısı üretir.</div>
+        <span class="pipe-tag">DeepSeek-OCR</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <span class="pipe-icon">🧠</span>
+        <div class="pipe-title">Alan Çıkarma</div>
+        <div class="pipe-desc">Gemma 4 GGUF modeli Markdown'ı okuyarak fatura numarası, tarih, VKN, KDV ve tutarları JSON olarak çıkarır.</div>
+        <span class="pipe-tag">Gemma 4</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <span class="pipe-icon">📊</span>
+        <div class="pipe-title">Çıktı</div>
+        <div class="pipe-desc">Kullanıcı alanları inceleme ekranında doğrular ve onaylar. Excel veya CSV olarak dışa aktarılır.</div>
+        <span class="pipe-tag">XLSX / CSV</span>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <br /><br />
+    <div class="feature-grid">
+      <div class="feature-card reveal">
+        <span class="feature-icon">🔒</span>
+        <div class="feature-title">Tam Veri Gizliliği</div>
+        <p class="feature-desc">Hiçbir fatura verisi internet bağlantısı gerektirmez. Tüm işleme bilgisayarınızda, çevrimdışı gerçekleşir.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">⚡</span>
+        <div class="feature-title">Sıfır API Maliyeti</div>
+        <p class="feature-desc">Google, OpenAI veya başka herhangi bir bulut servisine bağımlılık yoktur. Bir kez kur, sonsuza kadar kullan.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">🦀</span>
+        <div class="feature-title">Rust + Tauri 2.0</div>
+        <p class="feature-desc">Electron değil — Rust çekirdeği sayesinde ultra düşük RAM kullanımı ve anında başlatma süresi.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">📋</span>
+        <div class="feature-title">Sonsuz Şablon</div>
+        <p class="feature-desc">Farklı tedarikçiler için farklı fatura şablonları oluşturun. Her şablon kendi alan setini tanımlar.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">🔧</span>
+        <div class="feature-title">GPU Opsiyonel</div>
+        <p class="feature-desc">NVIDIA gerektirmez. CPU üzerinde çalışır; GPU varsa hız artışı için katman sayısını artırabilirsiniz.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">📦</span>
+        <div class="feature-title">Tek Tıkla Kurulum</div>
+        <p class="feature-desc">llama.cpp motorunu ve GGUF modellerini sürükle-bırak ile yükleyin. Karmaşık yapılandırma yok.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr />
+
+  <!-- KURULUM -->
+  <section class="full-width" id="kurulum">
+    <div class="section-inner">
+      <div class="section-label">Başlangıç</div>
+      <h2 class="section-title">Kurulum</h2>
+      <p class="section-desc">Üç adımda çalışır hale getirin.</p>
+
+      <div class="install-steps">
+
+        <div class="install-step reveal">
+          <h4>Uygulamayı İndir</h4>
+          <p>
+            <a href="https://github.com/Nec0ti/Fatrocu/releases/latest" target="_blank">Releases sayfasından</a> en son sürümü indirin:
+          </p>
+          <ul>
+            <li><strong>Fatrocu_3.0.0_x64-setup.exe</strong> — NSIS kurulum sihirbazı (önerilen)</li>
+            <li><strong>Fatrocu_3.0.0_x64_en-US.msi</strong> — MSI paketi</li>
+            <li><strong>fatrocu.exe</strong> — Taşınabilir, kurulum gerektirmez</li>
+          </ul>
+        </div>
+
+        <div class="install-step reveal">
+          <h4>llama.cpp Motorunu Kur</h4>
+          <p>
+            Uygulamayı açın → <strong>Ayarlar</strong> sekmesi → <strong>"Motoru Tek Tıkla Kur"</strong> butonuna basın.<br />
+            llama-cli.exe otomatik olarak GitHub üzerinden indirilir ve yapılandırılır.
+          </p>
+          <p style="margin-top:10px;font-size:0.78rem;color:var(--gray-600);">
+            Manuel kurulum için: <a href="https://github.com/ggerganov/llama.cpp/releases" target="_blank">llama.cpp releases</a> → <code>llama-bXXXX-bin-win-cpu-x64.zip</code>
+          </p>
+        </div>
+
+        <div class="install-step reveal">
+          <h4>Modelleri Yükle</h4>
+          <p>
+            <strong>Yöntem A (Kolay):</strong> GGUF dosyalarını Ayarlar ekranındaki sürükle-bırak alanına bırakın.<br />
+            Program modeli otomatik tanır ve yapılandırır.
+          </p>
+          <p style="margin-top:10px;">
+            <strong>Yöntem B:</strong> GGUF dosyalarını uygulamanın <code>gguf/</code> klasörüne yerleştirin.
+            Uygulama başlangıçta bu klasörü otomatik tarar.
+          </p>
+        </div>
+
+      </div>
+
+      <br /><br />
+
+      <!-- Model Tablosu -->
+      <div class="section-label">Model Gereksinimleri</div>
+      <h3 class="section-title" style="font-size:1.6rem;margin-bottom:32px;">Hangi Modeli İndirmeliyim?</h3>
+
+      <div class="model-table-wrap reveal">
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Amaç</th>
+              <th>Boyut</th>
+              <th>RAM</th>
+              <th>İndirme</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>DeepSeek-OCR Q6_K</strong></td>
+              <td>OCR — Görüntü → Metin</td>
+              <td>~2.4 GB</td>
+              <td>~4 GB</td>
+              <td><a href="https://huggingface.co/NexaAI/DeepSeek-OCR-GGUF" target="_blank">HuggingFace →</a></td>
+            </tr>
+            <tr>
+              <td><strong>Gemma 4 E4B IQ4_XS</strong> ⭐</td>
+              <td>Alan Çıkarma (Önerilen)</td>
+              <td>~4.5 GB</td>
+              <td>~6 GB</td>
+              <td><a href="https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF" target="_blank">HuggingFace →</a></td>
+            </tr>
+            <tr>
+              <td><strong>Gemma 4 E2B Q4_K_M</strong></td>
+              <td>Hafif — Düşük RAM</td>
+              <td>~1.4 GB</td>
+              <td>~3 GB</td>
+              <td><a href="https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF" target="_blank">HuggingFace →</a></td>
+            </tr>
+            <tr>
+              <td><strong>Gemma 4 12B Q4_K_M</strong></td>
+              <td>Yüksek Doğruluk</td>
+              <td>~7.5 GB</td>
+              <td>~10 GB</td>
+              <td><a href="https://huggingface.co/unsloth/gemma-4-12b-it-GGUF" target="_blank">HuggingFace →</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <hr />
+
+  <!-- KULLANIM -->
+  <section id="kullanim">
+    <div class="section-label">Kullanım Kılavuzu</div>
+    <h2 class="section-title">Nasıl Kullanılır?</h2>
+    <p class="section-desc">
+      Kurulum tamamlandıktan sonra fatura işleme süreci dört basit adımdan oluşur.
+    </p>
+
+    <div class="feature-grid">
+      <div class="feature-card reveal">
+        <span class="feature-icon" style="font-size:2.5rem;font-weight:900;color:#000;">①</span>
+        <div class="feature-title">Fatura Yükle</div>
+        <p class="feature-desc">
+          Ana ekranda PDF, PNG veya JPG dosyalarını sürükleyip bırakın ya da "Dosya Seç" butonunu kullanın.
+          Çoklu dosya seçimi desteklenir.
+        </p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon" style="font-size:2.5rem;font-weight:900;color:#000;">②</span>
+        <div class="feature-title">AI İşleme</div>
+        <p class="feature-desc">
+          DeepSeek-OCR metni okur, Gemma 4 alanları çıkarır.
+          İşlem süresi model büyüklüğüne ve CPU/GPU hızına göre değişir (genellikle 15–120 saniye).
+        </p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon" style="font-size:2.5rem;font-weight:900;color:#000;">③</span>
+        <div class="feature-title">İncele & Düzenle</div>
+        <p class="feature-desc">
+          İnceleme ekranında çıkarılan alanları doğrulayın. Hatalı veya eksik alanları manuel olarak düzenleyebilirsiniz.
+        </p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon" style="font-size:2.5rem;font-weight:900;color:#000;">④</span>
+        <div class="feature-title">Onayla & Dışa Aktar</div>
+        <p class="feature-desc">
+          "Onayla" ile faturayı arşive ekleyin. Onaylanan tüm faturaları toplu olarak Excel (.xlsx) veya CSV olarak dışa aktarın.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <hr />
+
+  <!-- ŞABLONLAR -->
+  <section class="full-width" id="sablonlar">
+    <div class="section-inner">
+      <div class="section-label">Özelleştirme</div>
+      <h2 class="section-title">Fatura Şablonları</h2>
+      <p class="section-desc">
+        Her tedarikçi farklı fatura formatı kullanır. Şablonlar, AI'ın hangi alanları çıkaracağını tanımlar.
+      </p>
+
+      <div class="template-demo">
+        <div>
+          <h4 style="font-size:0.9rem;font-weight:900;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:20px;">Şablon Oluşturma Adımları</h4>
+          <div class="install-steps">
+            <div style="border:2px solid #000;padding:16px 16px 16px 60px;position:relative;box-shadow:var(--shadow-sm);">
+              <div style="position:absolute;left:0;top:0;bottom:0;width:44px;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;">1</div>
+              <strong style="font-size:0.82rem;">Ayarlar → Fatura Şablonları</strong>
+              <p style="font-size:0.78rem;color:var(--gray-600);margin-top:4px;">Üst menüden Ayarlar sekmesine gidin, "Fatura Şablonları" alt bölümünü açın.</p>
+            </div>
+            <div style="border:2px solid #000;padding:16px 16px 16px 60px;position:relative;box-shadow:var(--shadow-sm);">
+              <div style="position:absolute;left:0;top:0;bottom:0;width:44px;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;">2</div>
+              <strong style="font-size:0.82rem;">"+ Yeni Şablon" Butonuna Tıklayın</strong>
+              <p style="font-size:0.78rem;color:var(--gray-600);margin-top:4px;">Şablon adını girin (örn: "Tedarikçi A Faturaları").</p>
+            </div>
+            <div style="border:2px solid #000;padding:16px 16px 16px 60px;position:relative;box-shadow:var(--shadow-sm);">
+              <div style="position:absolute;left:0;top:0;bottom:0;width:44px;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;">3</div>
+              <strong style="font-size:0.82rem;">Alan Ekleyin</strong>
+              <p style="font-size:0.78rem;color:var(--gray-600);margin-top:4px;">Her alan için bir anahtar kelime ve etiket tanımlayın. AI bu alanları faturadan çıkarmaya çalışacaktır.</p>
+            </div>
+            <div style="border:2px solid #000;padding:16px 16px 16px 60px;position:relative;box-shadow:var(--shadow-sm);">
+              <div style="position:absolute;left:0;top:0;bottom:0;width:44px;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;">4</div>
+              <strong style="font-size:0.82rem;">Kaydet & Kullan</strong>
+              <p style="font-size:0.78rem;color:var(--gray-600);margin-top:4px;">Fatura yüklerken açılır menüden şablonunuzu seçin.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h4 style="font-size:0.9rem;font-weight:900;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:20px;">Örnek Şablon Alanları</h4>
+          <div class="template-fields reveal">
+            <div class="template-fields-header">Genel Fatura Şablonu</div>
+            <div class="template-field-row">
+              <span class="field-key">faturaNumarasi</span>
+              <span class="field-label">Fatura No</span>
+            </div>
+            <div class="template-field-row">
+              <span class="field-key">tarih</span>
+              <span class="field-label">Fatura Tarihi</span>
+            </div>
+            <div class="template-field-row">
+              <span class="field-key">vknTcNo</span>
+              <span class="field-label">VKN / TC No</span>
+            </div>
+            <div class="template-field-row">
+              <span class="field-key">kdvOrani</span>
+              <span class="field-label">KDV Oranı (%)</span>
+            </div>
+            <div class="template-field-row">
+              <span class="field-key">kdvTutari</span>
+              <span class="field-label">KDV Tutarı (₺)</span>
+            </div>
+            <div class="template-field-row">
+              <span class="field-key">toplamTutar</span>
+              <span class="field-label">Genel Toplam (₺)</span>
+            </div>
+            <div class="template-field-row">
+              <span class="field-key">saticiUnvani</span>
+              <span class="field-label">Satıcı Ünvanı</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr />
+
+  <!-- DERLEME -->
+  <section id="derleme">
+    <div class="section-label">Geliştirici</div>
+    <h2 class="section-title">Kaynak Koddan Derleme</h2>
+    <p class="section-desc">Geliştirmek veya katkıda bulunmak için kaynak kodu derleyebilirsiniz.</p>
+
+    <div class="feature-grid" style="margin-bottom:40px;">
+      <div class="feature-card reveal">
+        <div class="feature-title">Gereksinimler</div>
+        <p class="feature-desc">
+          <strong>Rust</strong> 1.75+<br />
+          <strong>Node.js</strong> 18+<br />
+          <strong>Python</strong> 3.10+ (PDF dönüştürme için)<br />
+          <strong>Git</strong>
+        </p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-title">Desteklenen Platform</div>
+        <p class="feature-desc">
+          Windows 10/11 x64 (birincil)<br />
+          macOS / Linux (deneysel)
+        </p>
+      </div>
+    </div>
+
+    <pre class="reveal"><span class="cm"># 1. Repoyu klonla</span>
+git clone https://github.com/Nec0ti/Fatrocu.git
+cd Fatrocu
+
+<span class="cm"># 2. Node bağımlılıklarını yükle</span>
+npm install
+
+<span class="cm"># 3. Geliştirme sunucusu (hot-reload)</span>
+npm run tauri dev
+
+<span class="cm"># 4. Dağıtım build — exe + MSI + NSIS oluşturur</span>
+npm run tauri build
+
+<span class="cm"># Çıktılar:</span>
+<span class="cm">#   src-tauri/target/release/fatrocu.exe</span>
+<span class="cm">#   src-tauri/target/release/bundle/msi/Fatrocu_3.0.0_x64_en-US.msi</span>
+<span class="cm">#   src-tauri/target/release/bundle/nsis/Fatrocu_3.0.0_x64-setup.exe</span></pre>
+
+    <br /><br />
+
+    <div class="section-label">Proje Yapısı</div>
+    <h3 class="section-title" style="font-size:1.4rem;margin-bottom:32px;">Mimari</h3>
+
+    <div class="arch-box reveal">
+      <div class="arch-header">Fatrocu v3.0 — Sistem Mimarisi</div>
+      <div class="arch-body">
+
+        <div class="arch-layer">
+          <div class="arch-layer-title">Frontend — React + TypeScript</div>
+          <div class="arch-layer-items">
+            <div class="arch-item">UploadPage.tsx</div>
+            <div class="arch-item">ReviewPage.tsx</div>
+            <div class="arch-item">SettingsPage.tsx</div>
+            <div class="arch-item">tauriService.ts</div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">↕ Tauri IPC (invoke)</div>
+
+        <div class="arch-layer">
+          <div class="arch-layer-title">Rust Backend — src-tauri/src/</div>
+          <div class="arch-layer-items">
+            <div class="arch-item">commands.rs</div>
+            <div class="arch-item">llama_engine.rs</div>
+            <div class="arch-item">storage.rs</div>
+            <div class="arch-item">pdf_converter.rs</div>
+            <div class="arch-item">models.rs</div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">↕ Subprocess</div>
+
+        <div class="arch-layer">
+          <div class="arch-layer-title">AI Engine — llama.cpp</div>
+          <div class="arch-layer-items">
+            <div class="arch-item">llama-cli.exe</div>
+            <div class="arch-item">DeepSeek-OCR.gguf</div>
+            <div class="arch-item">gemma-4-E4B.gguf</div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">↕ JSON</div>
+
+        <div class="arch-layer">
+          <div class="arch-layer-title">Yerel Depolama — %APPDATA%\Fatrocu\</div>
+          <div class="arch-layer-items">
+            <div class="arch-item">settings.json</div>
+            <div class="arch-item">invoices.json</div>
+            <div class="arch-item">models/</div>
+            <div class="arch-item">bin/</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <hr />
+
+  <!-- SORUNLAR -->
+  <section class="full-width" id="sorunlar">
+    <div class="section-inner">
+      <div class="section-label">Destek</div>
+      <h2 class="section-title">Sık Karşılaşılan Sorunlar</h2>
+      <p class="section-desc">
+        Çözülemeyen sorunlar için <a href="https://github.com/Nec0ti/Fatrocu/issues" target="_blank" style="color:#000;font-weight:800;">GitHub Issues</a> bölümünü kullanın.
+      </p>
+
+      <div class="trouble-list">
+        <div class="trouble-item reveal">
+          <div class="trouble-problem">llama-cli bulunamadı hatası</div>
+          <div class="trouble-solution">Ayarlar → "Motoru Tek Tıkla Kur" butonuna basın. Ya da llama.cpp'yi PATH ortam değişkeninize ekleyin.</div>
+        </div>
+        <div class="trouble-item reveal">
+          <div class="trouble-problem">Model dosyası bulunamadı</div>
+          <div class="trouble-solution">GGUF dosyasını <code>gguf/</code> klasörüne kopyalayın veya Ayarlar'daki sürükle-bırak alanını kullanın.</div>
+        </div>
+        <div class="trouble-item reveal">
+          <div class="trouble-problem">PDF sayfaları işlenmiyor</div>
+          <div class="trouble-solution">Python 3 kurulu olduğundan emin olun. Terminal'de <code>python --version</code> komutunu çalıştırın.</div>
+        </div>
+        <div class="trouble-item reveal">
+          <div class="trouble-problem">İşleme çok yavaş</div>
+          <div class="trouble-solution">Ayarlar'dan thread sayısını artırın. NVIDIA GPU varsa GPU Katmanı sayısını artırarak hızlandırabilirsiniz.</div>
+        </div>
+        <div class="trouble-item reveal">
+          <div class="trouble-problem">OCR sonuçları hatalı</div>
+          <div class="trouble-solution">Daha yüksek kalite GGUF quant kullanın (Q6_K önerilir). Fatura görüntüsünün net ve okunabilir olduğundan emin olun.</div>
+        </div>
+        <div class="trouble-item reveal">
+          <div class="trouble-problem">Yazılan ayarlar kaydolmuyor</div>
+          <div class="trouble-solution">Ayarlar ekranında "Değişiklikleri Kaydet" butonuna basın veya başka bir sekmeye geçin; değişiklikler otomatik kaydedilir.</div>
+        </div>
+        <div class="trouble-item reveal">
+          <div class="trouble-problem">Uygulama başlamıyor / hata veriyor</div>
+          <div class="trouble-solution">Microsoft Visual C++ Redistributable yüklü olduğundan emin olun. Yoksa <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" target="_blank">buradan</a> indirin.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr />
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">✦ FATROCU</div>
+    <div class="footer-links">
+      <a href="https://github.com/Nec0ti/Fatrocu" target="_blank">GitHub</a>
+      <a href="https://github.com/Nec0ti/Fatrocu/releases/latest" target="_blank">İndir</a>
+      <a href="https://github.com/Nec0ti/Fatrocu/issues" target="_blank">Hata Bildir</a>
+      <a href="https://github.com/Nec0ti/Fatrocu/blob/main/LICENSE" target="_blank">MIT Lisans</a>
+    </div>
+    <p class="footer-copy">
+      Fatrocu v3.0 · Rust + Tauri 2.0 · llama.cpp · DeepSeek-OCR · Gemma 4<br />
+      %100 Yerel · %100 Gizli · Sıfır API Maliyeti
+    </p>
+  </footer>
+
+  <script>
+    // Scroll reveal
+    const obs = new IntersectionObserver(
+      (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
+      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+    );
+    document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+  </script>
+</body>
+</html>

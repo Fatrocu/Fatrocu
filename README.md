@@ -1,113 +1,191 @@
-# Fatrocu v3.0 - Yerel NaviDC-OCR & Rust Tabanlı Masaüstü Fatura İşleme Uygulaması
+# ✦ FATROCU v3.0
 
 <div align="center">
 
-![Fatrocu Banner](https://img.shields.io/badge/Fatrocu-v3.0_Rust-indigo?style=for-the-badge&logo=rust)
-![Windows](https://img.shields.io/badge/Platform-Windows-blue?style=for-the-badge&logo=windows)
-![Model](https://img.shields.io/badge/AI_Engine-NaviDC--OCR_(1.2B)-emerald?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-orange?style=for-the-badge)
+```
+  ___  ____  ____  ____  ____  ___  _  _
+ / __)( ___)( ___)( ___)(  _ \/ _ \/ )( \
+ \__ \ )__)  )__)  )__)  )   ( (_) ) \/ (
+ (___/(____)(____)(____)(_)\_)\___/ \____/
 
-**Bulut bağımlılığı ve pahalı API maliyetleri olmadan; %100 yerel, gizlilik odaklı ve yüksek performanslı masaüstü fatura işleme sistemi.**
+     ★  AKILLI FATURA İŞLEME SİSTEMİ  ★
+```
+
+[![Release](https://img.shields.io/github/v/release/Nec0ti/Fatrocu?style=for-the-badge&color=000000&labelColor=ffffff&label=v3.0)](https://github.com/Nec0ti/Fatrocu/releases)
+[![Platform](https://img.shields.io/badge/Windows-x64-000000?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Nec0ti/Fatrocu/releases)
+[![Rust](https://img.shields.io/badge/Rust-Tauri_2.0-000000?style=for-the-badge&logo=rust&logoColor=white)](https://tauri.app)
+[![License](https://img.shields.io/badge/License-MIT-000000?style=for-the-badge)](LICENSE)
+[![Docs](https://img.shields.io/badge/Docs-GitHub_Pages-000000?style=for-the-badge)](https://nec0ti.github.io/Fatrocu)
+
+**%100 yerel · Bulut yok · API maliyeti yok · Veri gizliliği tam**
+
+[📦 İndir](https://github.com/Nec0ti/Fatrocu/releases/latest) · [📚 Dokümantasyon](https://nec0ti.github.io/Fatrocu) · [🐛 Hata Bildir](https://github.com/Nec0ti/Fatrocu/issues)
 
 </div>
 
 ---
 
-## 🌟 Neler Değişti? (v2.2 -> v3.0 Rust & NaviDC-OCR)
+## ✦ Nedir?
 
-1. **Bulut API Bağımlılığı Kaldırıldı:** 
-   - Google Gemini yerine tamamen yerel çalışan **NaviDC-OCR** (1.2B parametreli hafif Belge VLM'i) entegre edildi.
-   - Hiçbir fatura veya veri harici sunuculara gitmez; **%100 veri gizliliği ve sıfır API maliyeti**.
-2. **Web'den Yerel Windows Masaüstü Uygulamasına (Rust & Tauri 2.0):**
-   - Tarayıcı yerine tek tıklamayla çalışan yerel Windows uygulaması (`.exe`).
-   - Rust çekirdeği ile anında başlatma, ultra düşük RAM kullanımı ve yerel dosya sistemi optimizasyonları.
-3. **Otomatik PDF -> Yüksek Çözünürlüklü Görsel Dönüştürme:**
-   - NaviDC-OCR görseller üzerinden çalıştığı için çok sayfalı PDF'ler ve taramalar Rust çekirdeği tarafından otomatik olarak yüksek çözünürlüklü PNG'lere rasterize edilir.
-4. **Gelişmiş Görsel & Poligon (Bounding Box) Arayüzü:**
-   - Yakınlaştırma (zoom), kaydırma (pan) ve faturadaki her bir alanın görseldeki koordinatlarını gösteren SVG poligon katmanı.
-5. **Yerel SQLite/JSON Depolama & Excel/CSV Çıktısı:**
-   - `rust_xlsxwriter` ile yüksek performanslı, biçimlendirilmiş yerel `.xlsx` ve `.csv` dışa aktarımı.
+**Fatrocu**, faturalarınızı yapay zeka ile otomatik olarak işleyen, tamamen yerel çalışan bir Windows masaüstü uygulamasıdır.
+
+- **PDF ve görüntü faturalarını** okur
+- **Tüm alanları otomatik çıkarır** (fatura no, tarih, VKN, KDV, toplam tutar…)
+- **Excel ve CSV** olarak dışa aktarır
+- **Hiçbir veri** internete gitmez — her şey bilgisayarınızda kalır
+
+```
+┌─────────────────────────────────────────────────┐
+│  PDF/PNG Fatura                                  │
+│       ↓                                          │
+│  DeepSeek-OCR (GGUF) ── görüntü → markdown      │
+│       ↓                                          │
+│  Gemma 4 (GGUF) ────── markdown → JSON alanlar  │
+│       ↓                                          │
+│  Excel / CSV Dışa Aktarım                        │
+└─────────────────────────────────────────────────┘
+```
 
 ---
 
-## 🚀 Sistem Mimarisi
+## ✦ Kurulum
 
+### 1. Installer ile (Önerilen)
+
+[**Releases sayfasından**](https://github.com/Nec0ti/Fatrocu/releases/latest) en son sürümü indirin:
+
+| Dosya | Açıklama |
+|---|---|
+| `Fatrocu_3.0.0_x64-setup.exe` | NSIS kurulum sihirbazı |
+| `Fatrocu_3.0.0_x64_en-US.msi` | MSI paketi |
+| `fatrocu.exe` | Taşınabilir (kurulum gerektirmez) |
+
+### 2. Model Kurulumu
+
+Fatrocu çalışmak için iki GGUF modeline ihtiyaç duyar:
+
+#### Yöntem A — Sürükle & Bırak (Kolay) ✓
+1. Uygulamayı açın → **Ayarlar** sekmesine gidin
+2. Model dosyalarını (`*.gguf`) **"Model Sürükle-Bırak"** alanına bırakın
+3. Program modeli otomatik tanır ve yapılandırır
+
+#### Yöntem B — Klasöre Yerleştir
+Model dosyalarını uygulama dizinindeki `gguf/` klasörüne koyun:
 ```
 Fatrocu/
-├── src-tauri/                     # Rust Tabanlı Çekirdek Motor (Tauri 2.0)
-│   ├── src/
-│   │   ├── commands.rs            # IPC Komutları (Veri saklama, Excel, OCR köprüsü)
-│   │   ├── models.rs              # Fatura, Şablon ve Alan Veri Modelleri
-│   │   ├── pdf_converter.rs       # PDF -> Yüksek Çözünürlüklü Görsel Dönüştürücü
-│   │   ├── navidc_client.rs       # NaviDC-OCR HTTP İletişim & Yan Süreç Yöneticisi
-│   │   ├── excel_export.rs        # Yerel Excel (.xlsx) ve CSV Üretici
-│   │   └── storage.rs             # %APPDATA%/Fatrocu Kalıcı Depolama Motoru
-│   └── Cargo.toml
-├── navidc-engine/                 # Yerel NaviDC-OCR Python Çıkarım Motoru
-│   ├── server.py                  # FastAPI / Uvicorn REST API Çıkarım Sunucusu
-│   ├── requirements.txt           # Model bağımlılıkları (Torch, Transformers, vLLM)
-│   ├── setup_env.bat              # Tek tıkla ortam kurulumu
-│   └── start_server.bat           # Motor başlatıcı
-├── src/                           # Modern Masaüstü Arayüzü (React 18 + TS + Tailwind)
-│   ├── pages/                     # Yükle, Kontrol Et, Onaylananlar, Ayarlar
-│   ├── components/                # DocumentViewer (Pan/Zoom/SVG BBox), Kartlar, Header
-│   └── services/                  # Tauri IPC Köprüsü
-└── .github/workflows/             # Otomatik Windows .exe GitHub Release İş Akışı
+└── gguf/
+    ├── DeepSeek-OCR.Q6_K.gguf     ← OCR modeli
+    └── gemma-4-E4B-it-IQ4_XS.gguf ← Alan çıkarma modeli
 ```
+
+#### Yöntem C — Tek Tıkla llama.cpp Kur
+Ayarlar → **"Motoru Tek Tıkla Kur"** butonu → llama-cli otomatik indirilir
+
+#### Model İndirme Linkleri
+
+| Model | Amaç | İndirme |
+|---|---|---|
+| `NexaAI/DeepSeek-OCR-GGUF` | OCR — Görüntü → Metin | [HuggingFace →](https://huggingface.co/NexaAI/DeepSeek-OCR-GGUF) |
+| `unsloth/gemma-4-E4B-it-GGUF` | Alan Çıkarma (Önerilen) | [HuggingFace →](https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF) |
+| `unsloth/gemma-4-E2B-it-GGUF` | Hafif (Düşük RAM) | [HuggingFace →](https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF) |
 
 ---
 
-## 🛠️ Kurulum ve Çalıştırma
+## ✦ Kullanım
 
-### 1. Gereksinimler
-- **Windows 10 / 11 (64-bit)**
-- **Rust & Cargo** (`rustup`)
-- **Node.js 18+** ve `npm`
-- **Python 3.10+** (NaviDC-OCR motoru için)
-
-### 2. Adım Adım Başlatma
-
-#### A. NaviDC-OCR Motorunun Kurulması:
-```cmd
-cd navidc-engine
-setup_env.bat
-start_server.bat
 ```
-*(Sunucu varsayılan olarak `http://127.0.0.1:8765` adresinde çalışır).*
+1. Fatrocu'yu açın
+2. Fatura PDF/PNG dosyalarını sürükleyin veya "Fatura Yükle" butonunu kullanın
+3. AI pipeline otomatik işler (OCR → Alan çıkarma)
+4. İnceleme ekranında alanları doğrulayın / düzenleyin
+5. "Onayla" → Excel veya CSV olarak dışa aktarın
+```
 
-#### B. Fatrocu Masaüstü Uygulamasının Çalıştırılması:
-```cmd
-# Kök dizinde (Fatrocu/)
+### Fatura Şablonları
+
+Farklı firma formatları için şablon oluşturabilirsiniz:
+
+1. **Ayarlar → Fatura Şablonları** sekmesine gidin
+2. **"+ Yeni Şablon"** butonuna tıklayın
+3. Çıkarmak istediğiniz alanları ekleyin (örn: `siparis_no`, `kdv_orani`)
+4. Şablonu kaydedin
+5. Fatura yüklerken şablonu seçin
+
+---
+
+## ✦ Derleme (Kaynak Koddan)
+
+### Gereksinimler
+
+| Araç | Sürüm |
+|---|---|
+| Rust | 1.75+ |
+| Node.js | 18+ |
+| Python | 3.10+ |
+
+```powershell
+# Repoyu klonla
+git clone https://github.com/Nec0ti/Fatrocu.git
+cd Fatrocu
+
+# Bağımlılıkları kur
 npm install
+
+# Geliştirme modu (hot-reload)
 npm run tauri dev
-```
 
-#### C. Yayın Sürümü (.exe) Derleme:
-```cmd
+# Dağıtım build (exe + MSI + NSIS)
 npm run tauri build
+# Çıktılar: src-tauri/target/release/bundle/
 ```
-Derlenen Windows kurulum dosyası ve çalıştırılabilir `.exe` dosyası `src-tauri/target/release/bundle/` altında oluşturulur.
 
 ---
 
-## 📋 Kullanım Kılavuzu
+## ✦ Mimari
 
-1. **Şablon Seçimi & Dosya Yükleme:**
-   - `e-Arşiv Fatura`, `ÖKC/Yazar Kasa Fişi` veya kendi oluşturduğunuz özel şablonu seçin.
-   - PDF veya görsel dosyalarınızı sürükleyip bırakın.
-2. **Otomatik Çıkarım (NaviDC-OCR):**
-   - NaviDC-OCR belgenizi tarar, fatura no, tarih, satıcı, tutar ve KDV detaylarını çıkarır.
-3. **Etkileşimli Kontrol (Check Page):**
-   - Faturanın önizlemesi üzerinde yakınlaştırma/kaydırma yapın.
-   - Form alanlarına tıkladığınızda görseldeki ilgili alan vurgulanır.
-   - Yeni alan veya satır kalemi ekleyip çıkartabilirsiniz.
-4. **Onaylama & Arşiv:**
-   - "Kaydet ve Onayla" veya "Onayla ve Sonrakine Geç" butonuna basın.
-5. **Toplu Excel / CSV İndirme:**
-   - "Onaylananlar" sekmesinden tek tıkla düzenli `.xlsx` tablosu indirin.
+```
+src/                    ← React + TypeScript frontend
+  pages/
+    UploadPage.tsx      ← Fatura yükleme ekranı
+    ReviewPage.tsx      ← İnceleme ve onay ekranı
+    SettingsPage.tsx    ← Model ve şablon yönetimi
+  services/
+    tauriService.ts     ← Rust ↔ Frontend köprüsü
+
+src-tauri/src/          ← Rust backend
+  llama_engine.rs       ← DeepSeek-OCR + Gemma 4 pipeline
+  commands.rs           ← Tauri IPC komutları
+  storage.rs            ← JSON tabanlı yerel depolama
+  pdf_converter.rs      ← PDF → PNG dönüştürücü
+  models.rs             ← Veri modelleri
+```
 
 ---
 
-## 📄 Lisans
-Bu proje **MIT Lisansı** altında sunulmaktadır.
-NaviDC-OCR modeli **Apache-2.0** lisansına sahiptir.
+## ✦ Sık Karşılaşılan Sorunlar
+
+| Sorun | Çözüm |
+|---|---|
+| `llama-cli bulunamadı` | Ayarlar → "Motoru Tek Tıkla Kur" ya da llama.cpp'yi PATH'e ekle |
+| `Model dosyası bulunamadı` | GGUF dosyasını `gguf/` klasörüne koy veya sürükle-bırak kullan |
+| PDF sayfaları işlenmiyor | Python 3 yüklü olduğundan emin ol (`python --version`) |
+| Yavaş işleme | Ayarlar'dan thread sayısını artır; GPU katmanı ekle (varsa) |
+| OCR hatalı sonuç | Daha yüksek kalite GGUF dosyası kullan (Q6_K önerilir) |
+
+---
+
+## ✦ Lisans
+
+MIT — Bkz: [LICENSE](LICENSE)
+
+---
+
+<div align="center">
+
+**Fatrocu v3.0** · Rust + Tauri 2.0 · llama.cpp · DeepSeek-OCR · Gemma 4
+
+*Made with ♥ — %100 Yerel, %100 Gizli*
+
+[nec0ti.github.io/Fatrocu](https://nec0ti.github.io/Fatrocu)
+
+</div>
