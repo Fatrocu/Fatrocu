@@ -1,23 +1,18 @@
 import React from 'react';
 
-export const Spinner: React.FC<{ size?: 'sm' | 'md' | 'lg'; className?: string }> = ({
-  size = 'md',
-  className = '',
-}) => {
-  const sizeClasses = {
-    sm: 'w-4 h-4 border-2',
-    md: 'w-6 h-6 border-2',
-    lg: 'w-10 h-10 border-3',
-  }[size];
-
-  return (
-    <div
-      className={`inline-block animate-spin rounded-full border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite] ${sizeClasses} ${className}`}
-      role="status"
-    >
-      <span className="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">
-        Yükleniyor...
-      </span>
-    </div>
-  );
-};
+export const Spinner: React.FC<{ size?: number }> = ({ size = 16 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    style={{ animation: 'spin 0.7s linear infinite' }}
+  >
+    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <circle cx="12" cy="12" r="10" opacity="0.2" />
+    <path d="M12 2a10 10 0 0 1 10 10" />
+  </svg>
+);

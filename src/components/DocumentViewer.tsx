@@ -1,12 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Maximize2, Layers } from 'lucide-react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { ZoomIn, ZoomOut, Maximize2, Move } from 'lucide-react';
 import { GroundedPoint } from '../types';
 
 interface DocumentViewerProps {
   imageSrc: string;
   fileName: string;
   activePolygon?: GroundedPoint[];
-  allPolygons?: Array<{ key: string; label: string; poly: GroundedPoint[] }>;
+  allPolygons?: { key: string; label: string; poly: GroundedPoint[] }[];
   onSelectField?: (key: string) => void;
 }
 
@@ -17,158 +17,129 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   allPolygons = [],
   onSelectField,
 }) => {
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [showAllPolygons, setShowAllPolygons] = useState(true);
-
   const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [panning, setPanning] = useState(false);
+  const panStart = useRef({ mx: 0, my: 0, ox: 0, oy: 0 });
+  const [imgSize, setImgSize] = useState({ w: 1, h: 1 });
+  const imgRef = useRef<HTMLImageElement>(null);
 
-  const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.25, 4));
-  const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.25, 0.5));
-  const handleReset = () => {
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
+  const clampOffset = useCallback(
+    (x: number, y: number, s: number) => {
+      const maxX = Math.max(0, (imgSize.w * s - (containerRef.current?.clientWidth ?? imgSize.w)) / 2 + 40);
+      const maxY = Math.max(0, (imgSize.h * s - (containerRef.current?.clientHeight ?? imgSize.h)) / 2 + 40);
+      return { x: Math.max(-maxX, Math.min(maxX, x)), y: Math.max(-maxY, Math.min(maxY, y)) };
+    },
+    [imgSize]
+  );
+
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setScale((s) => Math.max(0.3, Math.min(4, s + delta)));
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    setPanning(true);
+    panStart.current = { mx: e.clientX, my: e.clientY, ox: offset.x, oy: offset.y };
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setPosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
-    });
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!panning) return;
+    const nx = panStart.current.ox + (e.clientX - panStart.current.mx);
+    const ny = panStart.current.oy + (e.clientY - panStart.current.my);
+    setOffset(clampOffset(nx, ny, scale));
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+  const resetView = () => { setScale(1); setOffset({ x: 0, y: 0 }); };
 
-  const pointsToSvgPolygon = (points: GroundedPoint[]) => {
-    return points.map((p) => `${p.x * 100}%,${p.y * 100}%`).join(' ');
-  };
+  const polyToSvg = (poly: GroundedPoint[]) =>
+    poly.map((p) => `${p.x * imgSize.w},${p.y * imgSize.h}`).join(' ');
 
   return (
-    <div className="relative flex flex-col h-full bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-inner select-none">
-      {/* Top Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-900/90 border-b border-slate-800 backdrop-blur-sm z-10">
-        <span className="text-xs font-semibold text-slate-300 truncate max-w-xs">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#090909', borderRadius: 10, border: '1px solid #1a1a1a', overflow: 'hidden' }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: '1px solid #1a1a1a', flexShrink: 0 }}>
+        <span style={{ flex: 1, fontSize: 11, color: '#444', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {fileName}
         </span>
-
-        <div className="flex items-center gap-1">
+        {[
+          { Icon: ZoomOut,    action: () => setScale((s) => Math.max(0.3, s - 0.15)), title: 'Uzaklaştır' },
+          { Icon: ZoomIn,     action: () => setScale((s) => Math.min(4, s + 0.15)),   title: 'Yakınlaştır' },
+          { Icon: Maximize2,  action: resetView,                                        title: 'Sıfırla' },
+        ].map(({ Icon, action, title }) => (
           <button
-            onClick={() => setShowAllPolygons(!showAllPolygons)}
-            className={`p-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors ${
-              showAllPolygons
-                ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-            }`}
-            title="Tüm kutuları göster / gizle"
+            key={title}
+            onClick={action}
+            title={title}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: 4, borderRadius: 4, display: 'flex' }}
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Kutular</span>
+            <Icon size={13} />
           </button>
-
-          <div className="h-4 w-px bg-slate-700 mx-1" />
-
-          <button
-            onClick={handleZoomOut}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            title="Uzaklaştır"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-
-          <span className="text-xs font-mono text-slate-400 px-1">
-            {Math.round(scale * 100)}%
-          </span>
-
-          <button
-            onClick={handleZoomIn}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            title="Yakınlaştır"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={handleReset}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors ml-1"
-            title="Sıfırla"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-        </div>
+        ))}
+        <span style={{ fontSize: 10, color: '#333', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+          {Math.round(scale * 100)}%
+        </span>
       </div>
 
-      {/* Interactive Image & Polygon Canvas */}
+      {/* Canvas */}
       <div
         ref={containerRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        className={`relative flex-1 overflow-hidden flex items-center justify-center p-4 cursor-${
-          isDragging ? 'grabbing' : 'grab'
-        }`}
+        onWheel={onWheel}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={() => setPanning(false)}
+        onMouseLeave={() => setPanning(false)}
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          position: 'relative',
+          cursor: panning ? 'grabbing' : 'grab',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
       >
-        <div
-          className="relative transition-transform duration-75 origin-center shadow-2xl rounded-lg overflow-hidden bg-white"
-          style={{
-            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-          }}
-        >
+        <div style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: 'center', position: 'relative', lineHeight: 0 }}>
           <img
-            src={imageSrc}
+            ref={imgRef}
+            src={imageSrc.startsWith('data:') ? imageSrc : `data:image/png;base64,${imageSrc}`}
             alt={fileName}
-            className="max-h-[75vh] w-auto object-contain block pointer-events-none"
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              setImgSize({ w: img.naturalWidth, h: img.naturalHeight });
+            }}
+            style={{ display: 'block', maxWidth: '100%', userSelect: 'none', pointerEvents: 'none' }}
             draggable={false}
           />
 
-          {/* SVG Overlay for Bounding Polygons */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none">
-            {/* Render all detected field boxes */}
-            {showAllPolygons &&
-              allPolygons.map((item, idx) => {
-                if (!item.poly || item.poly.length < 3) return null;
-                const isCurrentActive =
-                  activePolygon &&
-                  JSON.stringify(activePolygon) === JSON.stringify(item.poly);
-                if (isCurrentActive) return null; // rendered separately with highlight
-
-                return (
-                  <polygon
-                    key={idx}
-                    points={pointsToSvgPolygon(item.poly)}
-                    fill="rgba(99, 102, 241, 0.15)"
-                    stroke="#818cf8"
-                    strokeWidth="1.5"
-                    strokeDasharray="4 2"
-                    className="pointer-events-auto cursor-pointer transition-all hover:fill-indigo-500/30"
-                    onClick={() => onSelectField && onSelectField(item.key)}
-                  >
-                    <title>{item.label}</title>
-                  </polygon>
-                );
-              })}
-
-            {/* Render currently focused field box (Active Highlight) */}
-            {activePolygon && activePolygon.length >= 3 && (
-              <polygon
-                points={pointsToSvgPolygon(activePolygon)}
-                fill="rgba(234, 179, 8, 0.35)"
-                stroke="#eab308"
-                strokeWidth="2.5"
-                className="animate-pulse pointer-events-none shadow-lg"
-              />
-            )}
-          </svg>
+          {/* SVG overlays */}
+          {imgSize.w > 1 && (
+            <svg
+              viewBox={`0 0 ${imgSize.w} ${imgSize.h}`}
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+            >
+              {allPolygons.map(({ key, poly }) => (
+                <polygon
+                  key={key}
+                  points={polyToSvg(poly)}
+                  fill="rgba(255,255,255,0.04)"
+                  stroke="rgba(255,255,255,0.25)"
+                  strokeWidth={1.5}
+                />
+              ))}
+              {activePolygon && activePolygon.length >= 3 && (
+                <polygon
+                  points={polyToSvg(activePolygon)}
+                  fill="rgba(255,255,255,0.12)"
+                  stroke="#fff"
+                  strokeWidth={2}
+                />
+              )}
+            </svg>
+          )}
         </div>
       </div>
     </div>

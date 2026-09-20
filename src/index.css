@@ -1,26 +1,116 @@
+/* ─── Fatrocu v4 — Monochrome Design System ───────────────────────────────── */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-slate-900 text-slate-100 antialiased font-sans;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  :root {
+    --bg:      #0a0a0a;
+    --surface: #111111;
+    --border:  #1f1f1f;
+    --muted:   #2a2a2a;
+    --text:    #e8e8e8;
+    --dim:     #666666;
+    --accent:  #ffffff;
   }
 
-  /* Custom dark scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
   }
-  ::-webkit-scrollbar-track {
-    background: #0f172a;
+
+  html, body, #root {
+    height: 100%;
   }
-  ::-webkit-scrollbar-thumb {
-    background: #334155;
-    border-radius: 4px;
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
   }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+
+  /* Selection */
+  ::selection { background: #ffffff22; }
+
+  input, textarea, select {
+    background-color: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
   }
+  input:focus, textarea:focus, select:focus {
+    border-color: #444;
+  }
+}
+
+@layer utilities {
+  /* Fade in */
+  .fade-in { animation: fadeIn 0.18s ease both; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Surface cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .card-sm {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+  }
+
+  /* Mono button */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s;
+    border: 1px solid transparent;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--dim);
+  }
+  .btn-ghost:hover { border-color: #444; color: var(--text); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { background: #d0d0d0; }
+
+  .btn-muted {
+    background: var(--muted);
+    color: var(--text);
+    border-color: var(--border);
+  }
+  .btn-muted:hover { background: #333; }
 }

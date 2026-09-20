@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { UploadCloud, File, X, CheckCircle, AlertCircle, FileSpreadsheet, Cpu } from 'lucide-react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { UploadCloud, FileText, X, ChevronDown } from 'lucide-react';
 import { InvoiceConfig } from '../types';
+import { Spinner } from './Spinner';
 
 interface FileUploadAreaProps {
   configs: InvoiceConfig[];
@@ -8,7 +9,11 @@ interface FileUploadAreaProps {
   onSelectConfig: (id: string) => void;
   onFilesSelected: (files: File[]) => void;
   isProcessing: boolean;
+  processingProgress: { current: number; total: number };
 }
+
+const ACCEPTED = '.pdf,.png,.jpg,.jpeg,.tiff,.tif,.bmp,.webp';
+const ACCEPTED_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/tiff', 'image/bmp', 'image/webp', ''];
 
 export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
   configs,
@@ -16,186 +21,177 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({
   onSelectConfig,
   onFilesSelected,
   isProcessing,
+  processingProgress,
 }) => {
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [queue, setQueue] = useState<File[]>([]);
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const addFiles = (files: FileList | File[]) => {
+    const valid = Array.from(files).filter(
+      (f) => ACCEPTED_TYPES.includes(f.type) || f.name.match(/\.(pdf|png|jpe?g|tiff?|bmp|webp)$/i)
+    );
+    setQueue((prev) => {
+      const existing = new Set(prev.map((f) => f.name + f.size));
+      return [...prev, ...valid.filter((f) => !existing.has(f.name + f.size))];
+    });
+  };
+
+  const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (!isProcessing) setIsDragOver(true);
+    setDragging(false);
+    addFiles(e.dataTransfer.files);
+  }, []);
+
+  const removeFromQueue = (idx: number) => setQueue((prev) => prev.filter((_, i) => i !== idx));
+
+  const handleSubmit = () => {
+    if (queue.length === 0 || isProcessing) return;
+    onFilesSelected(queue);
+    setQueue([]);
   };
 
-  const handleDragLeave = () => {
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    if (isProcessing) return;
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const files = Array.from(e.dataTransfer.files).filter(
-        (f) =>
-          f.type.startsWith('image/') ||
-          f.type === 'application/pdf' ||
-          f.name.endsWith('.pdf') ||
-          f.name.endsWith('.xml')
-      );
-      setSelectedFiles((prev) => [...prev, ...files]);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const files = Array.from(e.target.files);
-      setSelectedFiles((prev) => [...prev, ...files]);
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleStartProcessing = () => {
-    if (selectedFiles.length > 0) {
-      onFilesSelected(selectedFiles);
-      setSelectedFiles([]);
-    }
-  };
+  const pct = processingProgress.total > 0
+    ? Math.round((processingProgress.current / processingProgress.total) * 100)
+    : 0;
 
   return (
-    <div className="space-y-6">
-      {/* Template Selector Bar */}
-      <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700/80 shadow-md">
-        <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">
-          1. Fatura Şablonu Seçin
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {configs.map((config) => {
-            const isSelected = config.id === activeConfigId;
-            return (
-              <button
-                key={config.id}
-                onClick={() => onSelectConfig(config.id)}
-                className={`flex flex-col p-3.5 rounded-xl border text-left transition-all ${
-                  isSelected
-                    ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200 ring-2 ring-indigo-500/40 shadow-md'
-                    : 'bg-slate-900/60 border-slate-700/60 text-slate-300 hover:border-slate-600 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span className="font-bold text-sm text-white">{config.name}</span>
-                  {isSelected && <CheckCircle className="w-4 h-4 text-indigo-400" />}
-                </div>
-                <span className="text-xs text-slate-400 mt-1">
-                  {config.fields.length} Alan &bull; {config.lineItemFields?.length || 0} Satır Kalemi
-                </span>
-              </button>
-            );
-          })}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Template selector */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 12, color: '#666', flexShrink: 0 }}>Şablon:</span>
+        <div style={{ position: 'relative', flex: 1, maxWidth: 280 }}>
+          <select
+            value={activeConfigId}
+            onChange={(e) => onSelectConfig(e.target.value)}
+            style={{ width: '100%', appearance: 'none', paddingRight: 28 }}
+          >
+            {configs.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <ChevronDown
+            size={13}
+            color="#555"
+            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+          />
         </div>
       </div>
 
-      {/* Drag and Drop Box */}
+      {/* Drop zone */}
       <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => !isProcessing && fileInputRef.current?.click()}
-        className={`relative border-2 border-dashed rounded-3xl p-10 text-center cursor-pointer transition-all ${
-          isDragOver
-            ? 'border-indigo-400 bg-indigo-500/10 scale-[1.01]'
-            : 'border-slate-700 bg-slate-800/40 hover:border-indigo-500/60 hover:bg-slate-800/80'
-        } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={() => !isProcessing && inputRef.current?.click()}
+        style={{
+          border: `1px dashed ${dragging ? '#555' : '#222'}`,
+          borderRadius: 10,
+          padding: '48px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 8,
+          cursor: isProcessing ? 'not-allowed' : 'pointer',
+          background: dragging ? '#141414' : '#0d0d0d',
+          transition: 'all 0.15s',
+          userSelect: 'none',
+        }}
       >
+        <UploadCloud size={28} color={dragging ? '#888' : '#333'} />
+        <span style={{ color: '#555', fontSize: 12 }}>
+          PDF, PNG, JPEG veya TIFF sürükleyin / tıklayın
+        </span>
         <input
-          ref={fileInputRef}
+          ref={inputRef}
           type="file"
           multiple
-          accept="image/*,application/pdf,.pdf,.xml"
-          onChange={handleFileChange}
-          className="hidden"
-          disabled={isProcessing}
+          accept={ACCEPTED}
+          style={{ display: 'none' }}
+          onChange={(e) => e.target.files && addFiles(e.target.files)}
         />
-
-        <div className="flex flex-col items-center justify-center gap-3">
-          <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-inner">
-            <UploadCloud className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-200">
-              Faturaları buraya sürükleyip bırakın veya seçmek için tıklayın
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              PDF, PNG, JPG, JPEG veya XML formatlarını destekler &bull; Toplu yükleme yapılabilir
-            </p>
-          </div>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="px-2.5 py-1 rounded-md bg-slate-800 text-[11px] font-semibold text-slate-400 border border-slate-700">
-              PDF
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-slate-800 text-[11px] font-semibold text-slate-400 border border-slate-700">
-              PNG / JPG
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-indigo-950/60 text-[11px] font-semibold text-indigo-300 border border-indigo-700/40 flex items-center gap-1">
-              <Cpu className="w-3 h-3" /> NaviDC-OCR
-            </span>
-          </div>
-        </div>
       </div>
 
-      {/* Selected Files Queue Preview */}
-      {selectedFiles.length > 0 && (
-        <div className="bg-slate-800/90 rounded-2xl p-5 border border-slate-700 shadow-lg space-y-4">
-          <div className="flex justify-between items-center">
-            <h4 className="text-sm font-bold text-slate-200">
-              İşlenecek Belgeler ({selectedFiles.length})
-            </h4>
-            <button
-              onClick={() => setSelectedFiles([])}
-              className="text-xs text-red-400 hover:text-red-300 font-semibold"
+      {/* Queue */}
+      {queue.length > 0 && (
+        <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 11, color: '#555', marginBottom: 4, fontWeight: 600 }}>
+            KUYRUK ({queue.length})
+          </div>
+          {queue.map((f, i) => (
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '5px 8px',
+                borderRadius: 6,
+                background: '#111',
+                fontSize: 12,
+              }}
             >
-              Tümünü Temizle
-            </button>
-          </div>
-
-          <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
-            {selectedFiles.map((file, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60 text-xs text-slate-300"
+              <FileText size={12} color="#555" />
+              <span style={{ flex: 1, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {f.name}
+              </span>
+              <span style={{ color: '#444', fontSize: 11, flexShrink: 0 }}>
+                {(f.size / 1024).toFixed(0)} KB
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); removeFromQueue(i); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#444', padding: 2 }}
               >
-                <div className="flex items-center gap-2.5 truncate">
-                  <File className="w-4 h-4 text-indigo-400 shrink-0" />
-                  <span className="font-medium truncate">{file.name}</span>
-                  <span className="text-slate-500 text-[10px]">
-                    ({(file.size / 1024).toFixed(1)} KB)
-                  </span>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFile(idx);
-                  }}
-                  className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-red-400 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={handleStartProcessing}
-            disabled={isProcessing}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
-          >
-            <Cpu className="w-4 h-4" />
-            <span>NaviDC-OCR ile İşlemeyi Başlat ({selectedFiles.length} Belge)</span>
-          </button>
+                <X size={12} />
+              </button>
+            </div>
+          ))}
         </div>
+      )}
+
+      {/* Process / Progress */}
+      {isProcessing ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#555' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Spinner size={12} />
+              İşleniyor…
+            </span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {processingProgress.current}/{processingProgress.total}
+            </span>
+          </div>
+          <div style={{ height: 3, background: '#1a1a1a', borderRadius: 99, overflow: 'hidden' }}>
+            <div
+              style={{
+                height: '100%',
+                background: '#fff',
+                borderRadius: 99,
+                width: `${pct}%`,
+                transition: 'width 0.3s',
+              }}
+            />
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={handleSubmit}
+          disabled={queue.length === 0}
+          style={{
+            padding: '9px 20px',
+            borderRadius: 7,
+            border: 'none',
+            background: queue.length === 0 ? '#1a1a1a' : '#fff',
+            color: queue.length === 0 ? '#333' : '#000',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: queue.length === 0 ? 'not-allowed' : 'pointer',
+            transition: 'all 0.12s',
+            alignSelf: 'flex-end',
+          }}
+        >
+          {queue.length > 0 ? `${queue.length} Belgeyi İşle →` : 'Belge Seçin'}
+        </button>
       )}
     </div>
   );

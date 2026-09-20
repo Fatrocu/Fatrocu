@@ -1,83 +1,36 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  ProcessedInvoice,
-  ExtractedInvoiceFields,
-  GroundedValue,
-  InvoiceConfig,
-  FieldConfig,
-  GroundedPoint,
+  ProcessedInvoice, ExtractedInvoiceFields, GroundedValue,
+  InvoiceConfig, FieldConfig, GroundedPoint,
 } from '../types';
 import { DocumentViewer } from '../components/DocumentViewer';
 import {
-  ArrowLeft,
-  Check,
-  ArrowRight,
-  Plus,
-  Trash2,
-  Cpu,
-  ChevronLeft,
-  ChevronRight,
-  Save,
+  ArrowLeft, Check, ChevronLeft, ChevronRight, Save, Plus, Trash2,
 } from 'lucide-react';
 
 interface CheckInvoicePageProps {
   invoice: ProcessedInvoice;
   config: InvoiceConfig;
-  onSave: (
-    invoiceId: string,
-    updatedData: ExtractedInvoiceFields,
-    updatedLineItems: any[],
-    customFields: FieldConfig[],
-    customLineItemFields: FieldConfig[]
-  ) => void;
-  onSaveAndNext: (
-    invoiceId: string,
-    updatedData: ExtractedInvoiceFields,
-    updatedLineItems: any[],
-    customFields: FieldConfig[],
-    customLineItemFields: FieldConfig[]
-  ) => void;
+  onSave: (id: string, data: ExtractedInvoiceFields, lines: any[], cf: FieldConfig[], clf: FieldConfig[]) => void;
+  onSaveAndNext: (id: string, data: ExtractedInvoiceFields, lines: any[], cf: FieldConfig[], clf: FieldConfig[]) => void;
   onBack: () => void;
   pendingReviewIds: string[];
   onNavigateToInvoice: (id: string) => void;
 }
 
-const generateKeyFromLabel = (label: string): string => {
-  return label
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9\s]/g, '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .split(' ')
-    .map((word, index) =>
-      index === 0
-        ? word.toLowerCase()
-        : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    )
-    .join('');
-};
+const toKey = (label: string) =>
+  label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim()
+    .split(/\s+/).map((w, i) => i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()).join('') +
+  Date.now().toString().slice(-4);
 
 export const CheckInvoicePage: React.FC<CheckInvoicePageProps> = ({
-  invoice,
-  config,
-  onSave,
-  onSaveAndNext,
-  onBack,
-  pendingReviewIds,
-  onNavigateToInvoice,
+  invoice, config, onSave, onSaveAndNext, onBack, pendingReviewIds, onNavigateToInvoice,
 }) => {
-  const [formData, setFormData] = useState<ExtractedInvoiceFields>(
-    invoice.extractedData || {}
-  );
+  const [formData, setFormData] = useState<ExtractedInvoiceFields>(invoice.extractedData || {});
   const [lineItems, setLineItems] = useState<any[]>(invoice.lineItems || []);
-  const [customFields, setCustomFields] = useState<FieldConfig[]>(
-    invoice.customFields || []
-  );
-  const [customLineItemFields, setCustomLineItemFields] = useState<FieldConfig[]>(
-    invoice.customLineItemFields || []
-  );
-  const [focusedFieldKey, setFocusedFieldKey] = useState<string | null>(null);
+  const [customFields, setCustomFields] = useState<FieldConfig[]>(invoice.customFields || []);
+  const [customLineItemFields, setCustomLineItemFields] = useState<FieldConfig[]>(invoice.customLineItemFields || []);
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
 
   useEffect(() => {
     setFormData(invoice.extractedData || {});
@@ -86,268 +39,174 @@ export const CheckInvoicePage: React.FC<CheckInvoicePageProps> = ({
     setCustomLineItemFields(invoice.customLineItemFields || []);
   }, [invoice]);
 
-  const allMainFields = useMemo(
-    () => [...config.fields, ...customFields],
-    [config.fields, customFields]
-  );
+  const allMain = useMemo(() => [...config.fields, ...customFields], [config.fields, customFields]);
+  const allLine = useMemo(() => [...(config.lineItemFields || []), ...customLineItemFields], [config.lineItemFields, customLineItemFields]);
 
-  const allLineItemFields = useMemo(
-    () => [...(config.lineItemFields || []), ...customLineItemFields],
-    [config.lineItemFields, customLineItemFields]
-  );
+  const allPolygons = useMemo(() =>
+    allMain.flatMap((f) => {
+      const p = formData[f.key]?.boundingPoly;
+      return p && p.length >= 3 ? [{ key: f.key, label: f.label, poly: p }] : [];
+    }), [allMain, formData]);
 
-  // Collect all polygons for the DocumentViewer
-  const allPolygons = useMemo(() => {
-    const polys: Array<{ key: string; label: string; poly: GroundedPoint[] }> = [];
-    allMainFields.forEach((f) => {
-      const gv = formData[f.key];
-      if (gv && gv.boundingPoly && gv.boundingPoly.length >= 3) {
-        polys.push({ key: f.key, label: f.label, poly: gv.boundingPoly });
-      }
-    });
-    return polys;
-  }, [allMainFields, formData]);
+  const activePolygon = useMemo(() =>
+    focusedKey ? formData[focusedKey]?.boundingPoly : undefined, [focusedKey, formData]);
 
-  const activePolygon = useMemo(() => {
-    if (!focusedFieldKey) return undefined;
-    return formData[focusedFieldKey]?.boundingPoly;
-  }, [focusedFieldKey, formData]);
+  const onChange = (key: string, value: string) =>
+    setFormData((p) => ({ ...p, [key]: { ...p[key], value } }));
 
-  const handleInputChange = (key: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [key]: { ...(prev[key] || {}), value },
-    }));
+  const onLineChange = (idx: number, key: string, value: string) =>
+    setLineItems((p) => p.map((r, i) => i === idx ? { ...r, [key]: { ...r[key], value } } : r));
+
+  const addMainField = () => {
+    const label = window.prompt('Alan adı:'); if (!label) return;
+    const key = toKey(label);
+    setCustomFields((p) => [...p, { key, label }]);
+    setFormData((p) => ({ ...p, [key]: { value: '' } }));
   };
 
-  const handleLineItemChange = (index: number, key: string, value: string) => {
-    setLineItems((prev) => {
-      const next = [...prev];
-      const row = { ...next[index] };
-      row[key] = { ...(row[key] || {}), value };
-      next[index] = row;
-      return next;
-    });
+  const addLineCol = () => {
+    const label = window.prompt('Sütun adı:'); if (!label) return;
+    const key = toKey(label);
+    setCustomLineItemFields((p) => [...p, { key, label }]);
+    setLineItems((p) => p.map((r) => ({ ...r, [key]: { value: '' } })));
   };
 
-  const addLineItemRow = () => {
-    const newRow: { [key: string]: GroundedValue } = {};
-    allLineItemFields.forEach((f) => {
-      newRow[f.key] = { value: '' };
-    });
-    setLineItems((prev) => [...prev, newRow]);
+  const addLineRow = () => {
+    const row: Record<string, GroundedValue> = {};
+    allLine.forEach((f) => { row[f.key] = { value: '' }; });
+    setLineItems((p) => [...p, row]);
   };
 
-  const removeLineItemRow = (index: number) => {
-    setLineItems((prev) => prev.filter((_, i) => i !== index));
+  const removeCustomField = (key: string) => {
+    setCustomFields((p) => p.filter((f) => f.key !== key));
+    setFormData((p) => { const n = { ...p }; delete n[key]; return n; });
   };
 
-  const addField = (type: 'main' | 'lineItem') => {
-    const label = window.prompt('Yeni alanın adını girin:');
-    if (!label) return;
-    const key = generateKeyFromLabel(label) + Date.now().toString().slice(-4);
+  const removeLineRow = (idx: number) => setLineItems((p) => p.filter((_, i) => i !== idx));
 
-    if (type === 'main') {
-      setCustomFields((prev) => [...prev, { key, label }]);
-      setFormData((prev) => ({ ...prev, [key]: { value: '' } }));
-    } else {
-      setCustomLineItemFields((prev) => [...prev, { key, label }]);
-      setLineItems((prev) =>
-        prev.map((row) => ({ ...row, [key]: { value: '' } }))
-      );
-    }
+  const idx = pendingReviewIds.indexOf(invoice.id);
+  const hasPrev = idx > 0;
+  const hasNext = idx >= 0 && idx < pendingReviewIds.length - 1;
+
+  const submit = (approve: boolean) => {
+    if (approve) onSaveAndNext(invoice.id, formData, lineItems, customFields, customLineItemFields);
+    else onSave(invoice.id, formData, lineItems, customFields, customLineItemFields);
   };
 
-  const removeCustomField = (key: string, type: 'main' | 'lineItem') => {
-    if (type === 'main') {
-      setCustomFields((prev) => prev.filter((f) => f.key !== key));
-      setFormData((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    } else {
-      setCustomLineItemFields((prev) => prev.filter((f) => f.key !== key));
-      setLineItems((prev) =>
-        prev.map((row) => {
-          const next = { ...row };
-          delete next[key];
-          return next;
-        })
-      );
-    }
-  };
+  // ── input style helper ───────────────────────────────────────────────────
+  const inp = (active: boolean): React.CSSProperties => ({
+    width: '100%',
+    background: active ? '#181818' : '#0f0f0f',
+    border: `1px solid ${active ? '#444' : '#1f1f1f'}`,
+    borderRadius: 5,
+    padding: '5px 8px',
+    fontSize: 12,
+    color: '#ddd',
+    outline: 'none',
+    transition: 'border-color 0.12s',
+  });
 
-  const currentPendingIndex = pendingReviewIds.indexOf(invoice.id);
-  const hasPrev = currentPendingIndex > 0;
-  const hasNext = currentPendingIndex >= 0 && currentPendingIndex < pendingReviewIds.length - 1;
-
-  const handleSaveClick = () => {
-    onSave(invoice.id, formData, lineItems, customFields, customLineItemFields);
-  };
-
-  const handleSaveAndNextClick = () => {
-    onSaveAndNext(
-      invoice.id,
-      formData,
-      lineItems,
-      customFields,
-      customLineItemFields
-    );
-  };
+  const btn = (primary: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 5,
+    padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    background: primary ? '#fff' : '#1a1a1a',
+    color: primary ? '#000' : '#888',
+    transition: 'opacity 0.1s',
+  });
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-200">
-      {/* Top Header & Actions Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-800/90 p-4 rounded-2xl border border-slate-700 shadow-md">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-semibold text-slate-200 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Listeye Dön</span>
-          </button>
-          <div>
-            <h3 className="font-bold text-sm text-white truncate max-w-sm">
-              {invoice.fileName}
-            </h3>
-            <span className="text-xs text-slate-400 font-medium">
-              {config.name} &bull; {invoice.modelUsed || 'NaviDC-OCR'}
-            </span>
+    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 12, height: 'calc(100vh - 80px)' }}>
+      {/* Top bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <button onClick={onBack} style={{ ...btn(false), gap: 4 }}>
+          <ArrowLeft size={13} /> Geri
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {invoice.fileName}
           </div>
+          <div style={{ fontSize: 11, color: '#444' }}>{config.name}</div>
         </div>
 
-        {/* Pending Invoices Pager & Action Buttons */}
-        <div className="flex items-center gap-2">
-          {pendingReviewIds.length > 1 && (
-            <div className="flex items-center gap-1 bg-slate-900/80 px-2 py-1 rounded-xl border border-slate-700 text-xs">
-              <button
-                disabled={!hasPrev}
-                onClick={() => onNavigateToInvoice(pendingReviewIds[currentPendingIndex - 1])}
-                className="p-1 hover:bg-slate-800 disabled:opacity-30 rounded text-slate-300"
-                title="Önceki Fatura"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="font-mono text-slate-300 font-bold px-1.5">
-                {currentPendingIndex + 1} / {pendingReviewIds.length}
-              </span>
-              <button
-                disabled={!hasNext}
-                onClick={() => onNavigateToInvoice(pendingReviewIds[currentPendingIndex + 1])}
-                className="p-1 hover:bg-slate-800 disabled:opacity-30 rounded text-slate-300"
-                title="Sonraki Fatura"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+        {pendingReviewIds.length > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#111', border: '1px solid #1f1f1f', borderRadius: 6, padding: '4px 8px' }}>
+            <button
+              disabled={!hasPrev}
+              onClick={() => onNavigateToInvoice(pendingReviewIds[idx - 1])}
+              style={{ background: 'none', border: 'none', cursor: hasPrev ? 'pointer' : 'default', color: hasPrev ? '#666' : '#222', padding: 2 }}
+            ><ChevronLeft size={13} /></button>
+            <span style={{ fontSize: 11, color: '#444', fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'center' }}>
+              {idx + 1} / {pendingReviewIds.length}
+            </span>
+            <button
+              disabled={!hasNext}
+              onClick={() => onNavigateToInvoice(pendingReviewIds[idx + 1])}
+              style={{ background: 'none', border: 'none', cursor: hasNext ? 'pointer' : 'default', color: hasNext ? '#666' : '#222', padding: 2 }}
+            ><ChevronRight size={13} /></button>
+          </div>
+        )}
 
-          <button
-            onClick={handleSaveClick}
-            className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs rounded-xl shadow-md transition-all"
-          >
-            <Save className="w-4 h-4" />
-            <span>Kaydet</span>
-          </button>
-
-          <button
-            onClick={handleSaveAndNextClick}
-            className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition-all"
-          >
-            <Check className="w-4 h-4" />
-            <span>Onayla ve Sonrakine Geç</span>
-          </button>
-        </div>
+        <button onClick={() => submit(false)} style={btn(false)}>
+          <Save size={13} /> Kaydet
+        </button>
+        <button onClick={() => submit(true)} style={btn(true)}>
+          <Check size={13} /> Onayla
+        </button>
       </div>
 
-      {/* Split View: Left Document Preview / Right Structured Form */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-210px)] min-h-[580px]">
-        {/* Left 6 Columns: Interactive Document Canvas */}
-        <div className="lg:col-span-6 h-full flex flex-col">
+      {/* Split pane */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, flex: 1, minHeight: 0 }}>
+        {/* Document viewer */}
+        <div style={{ minHeight: 0 }}>
           {invoice.previewImageBase64 ? (
             <DocumentViewer
               imageSrc={invoice.previewImageBase64}
               fileName={invoice.fileName}
               activePolygon={activePolygon}
               allPolygons={allPolygons}
-              onSelectField={(key) => setFocusedFieldKey(key)}
+              onSelectField={(k) => setFocusedKey(k)}
             />
           ) : (
-            <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center text-slate-500 text-sm">
-              Görsel önizleme yüklenemedi.
+            <div className="card" style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: 12 }}>
+              Önizleme yok
             </div>
           )}
         </div>
 
-        {/* Right 6 Columns: Structured Data Form & Line Items */}
-        <div className="lg:col-span-6 h-full overflow-y-auto bg-slate-800/80 rounded-2xl border border-slate-700 p-6 space-y-6 shadow-xl">
-          {/* Main Form Fields */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-700">
-              <h4 className="font-bold text-sm text-indigo-300 uppercase tracking-wider flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-indigo-400" />
-                <span>Temel Fatura Bilgileri</span>
-              </h4>
-              <button
-                type="button"
-                onClick={() => addField('main')}
-                className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-bold px-2 py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" /> Alan Ekle
+        {/* Form panel */}
+        <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Main fields */}
+          <div className="card" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#444', letterSpacing: '0.05em' }}>ALANLAR</span>
+              <button onClick={addMainField} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#444', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
+                <Plus size={12} /> Alan Ekle
               </button>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {allMainFields.map((field) => {
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {allMain.map((field) => {
                 const isCustom = customFields.some((cf) => cf.key === field.key);
-                const hasPoly =
-                  formData[field.key]?.boundingPoly &&
-                  formData[field.key]!.boundingPoly!.length >= 3;
-
+                const active = focusedKey === field.key;
                 return (
-                  <div
-                    key={field.key}
-                    className={`p-3 rounded-xl border transition-all ${
-                      focusedFieldKey === field.key
-                        ? 'bg-slate-700/80 border-indigo-500 ring-1 ring-indigo-500 shadow-md'
-                        : 'bg-slate-900/60 border-slate-700/70 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <label
-                        htmlFor={field.key}
-                        className="text-xs font-semibold text-slate-300 truncate"
-                      >
+                  <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <label style={{ fontSize: 11, color: active ? '#888' : '#444', fontWeight: 500 }}>
                         {field.label}
                       </label>
-                      <div className="flex items-center gap-1">
-                        {hasPoly && (
-                          <span
-                            className="w-2 h-2 rounded-full bg-indigo-400"
-                            title="Görselde konumu tespit edildi"
-                          />
-                        )}
-                        {isCustom && (
-                          <button
-                            type="button"
-                            onClick={() => removeCustomField(field.key, 'main')}
-                            className="p-0.5 text-slate-500 hover:text-red-400"
-                            title="Alanı Sil"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
+                      {isCustom && (
+                        <button onClick={() => removeCustomField(field.key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333', padding: 0 }}>
+                          <Trash2 size={11} />
+                        </button>
+                      )}
                     </div>
                     <input
                       type="text"
-                      id={field.key}
                       value={formData[field.key]?.value || ''}
-                      onFocus={() => setFocusedFieldKey(field.key)}
-                      onChange={(e) => handleInputChange(field.key, e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-lg py-1.5 px-2.5 text-sm text-slate-100 font-medium focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      onFocus={() => setFocusedKey(field.key)}
+                      onBlur={() => setFocusedKey(null)}
+                      onChange={(e) => onChange(field.key, e.target.value)}
+                      style={inp(active)}
                     />
                   </div>
                 );
@@ -355,67 +214,51 @@ export const CheckInvoicePage: React.FC<CheckInvoicePageProps> = ({
             </div>
           </div>
 
-          {/* Line Items / KDV Breakdown Table */}
-          {allLineItemFields.length > 0 && (
-            <div className="space-y-4 pt-4 border-t border-slate-700">
-              <div className="flex justify-between items-center">
-                <h4 className="font-bold text-sm text-indigo-300 uppercase tracking-wider">
-                  Satır Kalemleri &amp; KDV Detayları ({lineItems.length})
-                </h4>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => addField('lineItem')}
-                    className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-bold px-2 py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Sütun Ekle
+          {/* Line items */}
+          {allLine.length > 0 && (
+            <div className="card" style={{ padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#444', letterSpacing: '0.05em' }}>
+                  KALEMLER ({lineItems.length})
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={addLineCol} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#444', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <Plus size={12} /> Sütun
                   </button>
-                  <button
-                    type="button"
-                    onClick={addLineItemRow}
-                    className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 font-bold px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Satır Ekle
+                  <button onClick={addLineRow} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <Plus size={12} /> Satır
                   </button>
                 </div>
               </div>
-
               {lineItems.length > 0 ? (
-                <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-900/60 shadow-inner">
-                  <table className="w-full text-left text-xs border-collapse">
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                     <thead>
-                      <tr className="bg-slate-800 border-b border-slate-700 text-slate-300">
-                        {allLineItemFields.map((f) => (
-                          <th key={f.key} className="py-2.5 px-3 font-semibold">
+                      <tr>
+                        {allLine.map((f) => (
+                          <th key={f.key} style={{ padding: '6px 8px', textAlign: 'left', color: '#444', fontWeight: 600, borderBottom: '1px solid #1a1a1a', whiteSpace: 'nowrap' }}>
                             {f.label}
                           </th>
                         ))}
-                        <th className="py-2.5 px-2 w-10 text-center">İşlem</th>
+                        <th style={{ width: 28 }} />
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {lineItems.map((row, rowIdx) => (
-                        <tr key={rowIdx} className="hover:bg-slate-800/40">
-                          {allLineItemFields.map((f) => (
-                            <td key={f.key} className="p-2">
+                    <tbody>
+                      {lineItems.map((row, ri) => (
+                        <tr key={ri}>
+                          {allLine.map((f) => (
+                            <td key={f.key} style={{ padding: '3px 4px' }}>
                               <input
                                 type="text"
                                 value={row[f.key]?.value || ''}
-                                onChange={(e) =>
-                                  handleLineItemChange(rowIdx, f.key, e.target.value)
-                                }
-                                className="w-full bg-slate-800 border border-slate-700 rounded py-1 px-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                                onChange={(e) => onLineChange(ri, f.key, e.target.value)}
+                                style={{ width: '100%', background: '#0f0f0f', border: '1px solid #1a1a1a', borderRadius: 4, padding: '3px 6px', fontSize: 11, color: '#ccc', outline: 'none' }}
                               />
                             </td>
                           ))}
-                          <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => removeLineItemRow(rowIdx)}
-                              className="p-1 text-slate-500 hover:text-red-400 rounded"
-                              title="Satırı Sil"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
+                          <td style={{ padding: '3px 4px', textAlign: 'center' }}>
+                            <button onClick={() => removeLineRow(ri)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333' }}>
+                              <Trash2 size={11} />
                             </button>
                           </td>
                         </tr>
@@ -424,11 +267,23 @@ export const CheckInvoicePage: React.FC<CheckInvoicePageProps> = ({
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-6 bg-slate-900/40 rounded-xl border border-slate-800 text-xs text-slate-500">
-                  Satır kalemi bulunmuyor. Yeni eklemek için "Satır Ekle" butonunu kullanabilirsiniz.
+                <div style={{ textAlign: 'center', padding: 16, color: '#333', fontSize: 11 }}>
+                  Satır yok — "Satır" düğmesi ile ekleyin.
                 </div>
               )}
             </div>
+          )}
+
+          {/* Raw OCR */}
+          {invoice.rawOcr && (
+            <details className="card" style={{ padding: 12 }}>
+              <summary style={{ fontSize: 11, color: '#444', cursor: 'pointer', fontWeight: 600, letterSpacing: '0.05em' }}>
+                HAM OCR METNİ
+              </summary>
+              <pre style={{ marginTop: 10, fontSize: 10, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.6, maxHeight: 200, overflowY: 'auto' }}>
+                {invoice.rawOcr}
+              </pre>
+            </details>
           )}
         </div>
       </div>

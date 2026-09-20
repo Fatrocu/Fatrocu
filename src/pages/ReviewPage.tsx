@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ProcessedInvoiceCard } from '../components/ProcessedInvoiceCard';
-import { ProcessedInvoice, InvoiceConfig } from '../types';
-import { Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { InvoiceConfig, ProcessedInvoice } from '../types';
+import { Search } from 'lucide-react';
 
 interface ReviewPageProps {
   invoices: ProcessedInvoice[];
   configs: InvoiceConfig[];
-  onViewDetails: (invoiceId: string) => void;
-  onDeleteInvoice: (invoiceId: string) => void;
+  onViewDetails: (id: string) => void;
+  onDeleteInvoice: (id: string) => void;
   onStartReview: () => void;
 }
 
@@ -18,56 +18,85 @@ export const ReviewPage: React.FC<ReviewPageProps> = ({
   onDeleteInvoice,
   onStartReview,
 }) => {
-  const configMap = new Map(configs.map((c) => [c.id, c]));
-  const pendingInvoices = invoices.filter((i) => i.reviewStatus === 'pending');
+  const [query, setQuery] = useState('');
+  const pending = invoices.filter((i) => i.reviewStatus !== 'reviewed');
+
+  const filtered = pending.filter(
+    (i) =>
+      !query ||
+      i.fileName.toLowerCase().includes(query.toLowerCase()) ||
+      i.extractedData?.faturaNumarasi?.value?.toLowerCase().includes(query.toLowerCase())
+  );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Top Banner */}
-      <div className="flex flex-wrap justify-between items-center gap-4 bg-slate-800/90 p-6 rounded-3xl border border-slate-700 shadow-xl">
+    <div className="fade-in" style={{ maxWidth: 800, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div>
-          <h2 className="text-2xl font-black text-amber-400 flex items-center gap-2">
-            <Clock className="w-7 h-7" />
-            <span>Kontrol Bekleyen Faturalar</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Yapay zeka tarafından işlenen verileri kontrol edin, gerekirse düzeltip onaylayın.
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>İnceleme Kuyruğu</h1>
+          <p style={{ fontSize: 12, color: '#444', marginTop: 2 }}>
+            {pending.length} bekleyen belge
           </p>
         </div>
-
-        {pendingInvoices.length > 0 && (
+        <div style={{ flex: 1 }} />
+        {pending.length > 0 && (
           <button
             onClick={onStartReview}
-            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all group"
+            style={{
+              padding: '7px 16px',
+              background: '#fff',
+              color: '#000',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
           >
-            <span>İlk Faturayı İncele</span>
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            İncelemeye Başla →
           </button>
         )}
       </div>
 
-      {/* Pending Invoices List */}
-      {pendingInvoices.length > 0 ? (
-        <div className="space-y-3">
-          {pendingInvoices.map((invoice) => (
+      {/* Search */}
+      {pending.length > 0 && (
+        <div style={{ position: 'relative' }}>
+          <Search size={13} color="#444" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+          <input
+            placeholder="Dosya adı veya fatura no ara…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: '100%', paddingLeft: 30 }}
+          />
+        </div>
+      )}
+
+      {/* List */}
+      {filtered.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {filtered.map((inv) => (
             <ProcessedInvoiceCard
-              key={invoice.id}
-              invoice={invoice}
-              config={configMap.get(invoice.configId)}
+              key={inv.id}
+              invoice={inv}
+              config={configs.find((c) => c.id === inv.configId)}
               onViewDetails={onViewDetails}
-              onDelete={onDeleteInvoice}
+              onDeleteInvoice={onDeleteInvoice}
             />
           ))}
         </div>
       ) : (
-        <div className="mt-12 text-center text-slate-400 bg-slate-800/40 rounded-3xl py-16 border border-slate-800/80">
-          <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto text-emerald-400 mb-4 shadow-inner">
-            <CheckCircle2 className="w-8 h-8" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-200">Harika! Tüm Faturalar Kontrol Edildi</h3>
-          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-            Bekleyen faturanız bulunmuyor. Yeni faturalar yüklemek için "Yükle" sayfasına geçebilirsiniz.
-          </p>
+        <div
+          className="card"
+          style={{ padding: 40, textAlign: 'center', color: '#333' }}
+        >
+          {pending.length === 0 ? (
+            <>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+              <div style={{ fontSize: 13, color: '#555' }}>İnceleme kuyruğu boş.</div>
+            </>
+          ) : (
+            <div style={{ fontSize: 12, color: '#444' }}>Arama sonucu bulunamadı.</div>
+          )}
         </div>
       )}
     </div>
