@@ -1,16 +1,28 @@
+# Models / Heavy Binaries (HuggingFace'den indirilir veya release_assets kullanılır)
+gguf/
+*.gguf
+*.bin
+
+# Release çıktıları / Paketler
+/release_assets/
+*.exe
+*.msi
+*.zip
+*.tar.gz
+
 # Node
 node_modules/
 dist/
 .vite/
 npm-debug.log*
 
-# Rust
+# Rust & Tauri
 target/
 src-tauri/target/
 **/*.rs.bk
 Cargo.lock
 
-# Python / NaviDC
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -28,7 +40,6 @@ Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
 
-# User AppData / Cache
+# User AppData / Cache / Temp
 *.tmp
 *.temp
-/release_assets
