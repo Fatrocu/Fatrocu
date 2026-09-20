@@ -31,3 +31,4 @@ $RECYCLE.BIN/
 # User AppData / Cache
 *.tmp
 *.temp
+/release_assets
