@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ProcessedInvoiceCard } from '../components/ProcessedInvoiceCard';
 import { InvoiceConfig, ProcessedInvoice } from '../types';
-import { Search, Download, Trash2 } from 'lucide-react';
+import { Search, Download, Trash2, CheckCircle2, FileSpreadsheet, Archive } from 'lucide-react';
 
 interface ApprovedPageProps {
   invoices: ProcessedInvoice[];
@@ -14,67 +14,104 @@ interface ApprovedPageProps {
 }
 
 export const ApprovedPage: React.FC<ApprovedPageProps> = ({
-  invoices, configs, onViewDetails, onDeleteInvoice, onClearApproved, onExportExcel, onExportCsv,
+  invoices,
+  configs,
+  onViewDetails,
+  onDeleteInvoice,
+  onClearApproved,
+  onExportExcel,
+  onExportCsv,
 }) => {
   const [query, setQuery] = useState('');
 
   const filtered = invoices.filter(
-    (i) => !query ||
+    (i) =>
+      !query ||
       i.fileName.toLowerCase().includes(query.toLowerCase()) ||
-      i.extractedData?.faturaNumarasi?.value?.toLowerCase().includes(query.toLowerCase())
+      i.extractedData?.faturaNumarasi?.value?.toLowerCase().includes(query.toLowerCase()) ||
+      i.extractedData?.saticiUnvan?.value?.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
-    <div className="fade-in" style={{ maxWidth: 800, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div className="fade-in max-w-5xl mx-auto flex flex-col gap-8 pb-16">
+      
+      {/* Top Banner Card with Scribble Brutalism */}
+      <div className="scribble-card p-6 bg-white flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>Arşiv</h1>
-          <p style={{ fontSize: 12, color: '#444', marginTop: 2 }}>{invoices.length} onaylanmış belge</p>
+          <div className="flex items-center gap-2.5">
+            <Archive size={26} className="text-black stroke-[2.5]" />
+            <h1 className="font-heading font-black text-2xl text-black">
+              Onaylanmış Fatura Arşivi
+            </h1>
+            <span className="scribble-badge bg-black text-white text-xs font-scribble px-2.5 py-0.5">
+              {invoices.length} fatura
+            </span>
+          </div>
+          <p className="font-scribble text-sm text-neutral-600 font-semibold mt-1">
+            İncelenip onaylanmış tüm belgeler burada toplanır. Tek tıkla Excel veya CSV'ye dökebilirsiniz.
+          </p>
         </div>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', gap: 6 }}>
+
+        {/* Export & Action Buttons */}
+        <div className="flex items-center gap-3 shrink-0 flex-wrap">
           <button
             onClick={onExportExcel}
             disabled={invoices.length === 0}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#fff', color: '#000', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: invoices.length === 0 ? 'not-allowed' : 'pointer', opacity: invoices.length === 0 ? 0.3 : 1 }}
+            className={`scribble-btn px-5 py-2.5 text-xs flex items-center gap-2 ${
+              invoices.length === 0
+                ? 'opacity-40 cursor-not-allowed bg-neutral-100 text-neutral-400 border-neutral-300 shadow-none'
+                : 'scribble-btn-primary'
+            }`}
           >
-            <Download size={12} /> Excel
+            <FileSpreadsheet size={16} className="stroke-[2.5]" />
+            <span>Excel (.xlsx) İndir</span>
           </button>
+
           <button
             onClick={onExportCsv}
             disabled={invoices.length === 0}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#1a1a1a', color: '#888', border: '1px solid #222', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: invoices.length === 0 ? 'not-allowed' : 'pointer', opacity: invoices.length === 0 ? 0.3 : 1 }}
+            className={`scribble-btn px-4 py-2.5 text-xs flex items-center gap-2 ${
+              invoices.length === 0
+                ? 'opacity-40 cursor-not-allowed bg-neutral-100 text-neutral-400 border-neutral-300 shadow-none'
+                : 'scribble-btn-secondary'
+            }`}
           >
-            CSV
+            <Download size={16} className="stroke-[2.5]" />
+            <span>CSV</span>
           </button>
+
           {invoices.length > 0 && (
             <button
               onClick={onClearApproved}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'transparent', color: '#444', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+              className="p-2.5 rounded-xl border-2 border-black bg-white hover:bg-black hover:text-white transition-colors shadow-[2px_2px_0px_#000]"
+              title="Tüm Arşivi Temizle"
             >
-              <Trash2 size={12} /> Temizle
+              <Trash2 size={16} className="stroke-[2.5]" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search Input */}
       {invoices.length > 0 && (
-        <div style={{ position: 'relative' }}>
-          <Search size={13} color="#444" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+        <div className="relative">
           <input
-            placeholder="Ara…"
+            type="text"
+            placeholder="Arşivde fatura no, dosya adı veya satıcı ara..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            style={{ width: '100%', paddingLeft: 30 }}
+            className="w-full pl-12 pr-4 py-3.5 text-sm font-heading font-semibold"
+          />
+          <Search
+            size={20}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-black stroke-[2.5]"
           />
         </div>
       )}
 
-      {/* List */}
+      {/* Archive List */}
       {filtered.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div className="flex flex-col gap-3">
           {filtered.map((inv) => (
             <ProcessedInvoiceCard
               key={inv.id}
@@ -86,17 +123,23 @@ export const ApprovedPage: React.FC<ApprovedPageProps> = ({
           ))}
         </div>
       ) : (
-        <div className="card" style={{ padding: 48, textAlign: 'center', color: '#333' }}>
-          {invoices.length === 0 ? (
-            <>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>□</div>
-              <div style={{ fontSize: 12, color: '#444' }}>Henüz onaylanmış belge yok.</div>
-            </>
-          ) : (
-            <div style={{ fontSize: 12, color: '#444' }}>Sonuç bulunamadı.</div>
-          )}
+        <div className="scribble-card p-16 bg-white text-center flex flex-col items-center justify-center gap-4 border-dashed">
+          <div className="w-16 h-16 rounded-2xl border-[2.5px] border-black flex items-center justify-center bg-neutral-100 shadow-[3px_3px_0px_#000]">
+            <CheckCircle2 size={32} className="text-black stroke-[2.5]" />
+          </div>
+          <div>
+            <h3 className="font-heading font-black text-xl text-black">
+              {invoices.length === 0 ? 'Arşivde Henüz Onaylanmış Fatura Yok' : 'Arama Eşleşmesi Bulunamadı'}
+            </h3>
+            <p className="font-scribble text-sm text-neutral-600 font-semibold mt-1">
+              {invoices.length === 0
+                ? 'İnceleme kuyruğundaki belgeleri onayladıkça buraya eklenecektir.'
+                : 'Lütfen arama teriminizi kontrol edin.'}
+            </p>
+          </div>
         </div>
       )}
+
     </div>
   );
 };

@@ -1,19 +1,12 @@
 import React from 'react';
-import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react';
+import { X, CheckCircle2, AlertTriangle, Info, XCircle } from 'lucide-react';
 import { AlertType } from '../types';
 
 const ICONS: Record<AlertType, React.ElementType> = {
-  success: CheckCircle,
+  success: CheckCircle2,
   error: XCircle,
   warning: AlertTriangle,
   info: Info,
-};
-
-const COLORS: Record<AlertType, { bg: string; border: string; text: string }> = {
-  success: { bg: '#0d1a0d', border: '#1f3a1f', text: '#6bcf7f' },
-  error:   { bg: '#1a0d0d', border: '#3a1f1f', text: '#f87171' },
-  warning: { bg: '#1a160d', border: '#3a2f1f', text: '#fbbf24' },
-  info:    { bg: '#0d0f1a', border: '#1f233a', text: '#60a5fa' },
 };
 
 interface AlertMessageProps {
@@ -24,31 +17,22 @@ interface AlertMessageProps {
 
 export const AlertMessage: React.FC<AlertMessageProps> = ({ type, message, onClose }) => {
   const Icon = ICONS[type];
-  const c = COLORS[type];
 
   return (
-    <div
-      className="fade-in"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '10px 14px',
-        borderRadius: 8,
-        border: `1px solid ${c.border}`,
-        background: c.bg,
-        color: c.text,
-        fontSize: 12,
-        fontWeight: 500,
-      }}
-    >
-      <Icon size={14} style={{ flexShrink: 0 }} />
-      <span style={{ flex: 1 }}>{message}</span>
+    <div className="fade-in scribble-card p-4 bg-white flex items-center justify-between gap-4 border-[2.5px] border-black shadow-[4px_4px_0px_#000]">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg border-2 border-black flex items-center justify-center bg-black text-white shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+          <Icon size={18} className="stroke-[2.5]" />
+        </div>
+        <span className="font-heading font-bold text-sm text-black">
+          {message}
+        </span>
+      </div>
       <button
         onClick={onClose}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', color: c.text, opacity: 0.6, padding: 2 }}
+        className="w-8 h-8 rounded-lg border-2 border-black flex items-center justify-center hover:bg-black hover:text-white transition-colors shrink-0 shadow-[1.5px_1.5px_0px_#000]"
       >
-        <X size={13} />
+        <X size={16} className="stroke-[3]" />
       </button>
     </div>
   );

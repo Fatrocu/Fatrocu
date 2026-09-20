@@ -1,4 +1,4 @@
-/* ─── Fatrocu v4 — Monochrome Design System ───────────────────────────────── */
+/* ─── Fatrocu — Scribble Art Monochrome Design System (White Dominant) ───── */
 
 @tailwind base;
 @tailwind components;
@@ -6,13 +6,13 @@
 
 @layer base {
   :root {
-    --bg:      #0a0a0a;
-    --surface: #111111;
-    --border:  #1f1f1f;
-    --muted:   #2a2a2a;
-    --text:    #e8e8e8;
-    --dim:     #666666;
-    --accent:  #ffffff;
+    --bg:          #ffffff;
+    --surface:     #ffffff;
+    --border:      #000000;
+    --muted:       #f4f4f4;
+    --text:        #000000;
+    --dim:         #555555;
+    --line:        #111111;
   }
 
   * {
@@ -28,89 +28,155 @@
   body {
     background-color: var(--bg);
     color: var(--text);
-    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-    font-size: 13px;
-    line-height: 1.5;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    /* Subtle paper texture background with dots / grid */
+    background-image: radial-gradient(#000000 0.75px, transparent 0.75px);
+    background-size: 20px 20px;
+    background-color: #fafafa;
   }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+  /* Custom quirky doodle scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #ffffff; border-left: 2px solid #000; }
+  ::-webkit-scrollbar-thumb { background: #000000; border-radius: 0px; }
+  ::-webkit-scrollbar-thumb:hover { background: #333333; }
 
   /* Selection */
-  ::selection { background: #ffffff22; }
+  ::selection { background: #000000; color: #ffffff; }
 
   input, textarea, select {
-    background-color: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 13px;
+    background-color: #ffffff;
+    color: #000000;
+    border: 2px solid #000000;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 15px;
+    font-weight: 500;
     outline: none;
-    transition: border-color 0.15s;
+    transition: all 0.15s ease;
+    box-shadow: 2px 2px 0px #000000;
   }
   input:focus, textarea:focus, select:focus {
-    border-color: #444;
+    border-color: #000000;
+    box-shadow: 4px 4px 0px #000000;
+    transform: translate(-1px, -1px);
   }
 }
 
 @layer utilities {
-  /* Fade in */
-  .fade-in { animation: fadeIn 0.18s ease both; }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
+  .font-scribble {
+    font-family: 'Architects Daughter', cursive, sans-serif;
+  }
+  .font-heading {
+    font-family: 'Space Grotesk', sans-serif;
   }
 
-  /* Surface cards */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
+  /* Scribble-box styles with hand-drawn feel, bold borders, retro brutalist drop shadow */
+  .scribble-card {
+    background: #ffffff;
+    border: 2.5px solid #000000;
+    border-radius: 12px;
+    box-shadow: 5px 5px 0px #000000;
+    transition: all 0.15s ease;
   }
 
-  .card-sm {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 7px;
+  .scribble-card:hover {
+    box-shadow: 6px 6px 0px #000000;
   }
 
-  /* Mono button */
-  .btn {
+  .scribble-card-sm {
+    background: #ffffff;
+    border: 2px solid #000000;
+    border-radius: 8px;
+    box-shadow: 3px 3px 0px #000000;
+  }
+
+  /* Interactive scribble buttons */
+  .scribble-btn {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 6px 14px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 600;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 2.5px solid #000000;
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.12s;
-    border: 1px solid transparent;
+    box-shadow: 3px 3px 0px #000000;
+    transition: all 0.12s ease;
+    user-select: none;
   }
 
-  .btn-ghost {
-    background: transparent;
-    border-color: var(--border);
-    color: var(--dim);
+  .scribble-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0px #000000;
   }
-  .btn-ghost:hover { border-color: #444; color: var(--text); }
 
-  .btn-primary {
-    background: var(--accent);
-    color: #000;
-    border-color: var(--accent);
+  .scribble-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0px #000000;
   }
-  .btn-primary:hover { background: #d0d0d0; }
 
-  .btn-muted {
-    background: var(--muted);
-    color: var(--text);
-    border-color: var(--border);
+  .scribble-btn-primary {
+    background: #000000;
+    color: #ffffff;
   }
-  .btn-muted:hover { background: #333; }
+
+  .scribble-btn-primary:hover {
+    background: #1a1a1a;
+    color: #ffffff;
+  }
+
+  .scribble-btn-secondary {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .scribble-btn-secondary:hover {
+    background: #f4f4f4;
+  }
+
+  /* Wavy / sketchy underlines and badges */
+  .scribble-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    border: 1.5px solid #000000;
+    background: #ffffff;
+    font-weight: 700;
+    font-size: 12px;
+    box-shadow: 2px 2px 0px #000000;
+  }
+
+  /* Notebook paper lines effect */
+  .lined-paper {
+    background-color: #ffffff;
+    background-image: linear-gradient(#e5e5e5 1px, transparent 1px);
+    background-size: 100% 28px;
+    line-height: 28px;
+  }
+
+  /* Hand-drawn tape / tag effect */
+  .scribble-tag {
+    background: #ffffff;
+    border: 2px solid #000000;
+    transform: rotate(-1.5deg);
+    display: inline-block;
+    padding: 2px 8px;
+    font-weight: 800;
+    box-shadow: 2px 2px 0px #000000;
+  }
+
+  /* Fade in */
+  .fade-in { animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 }

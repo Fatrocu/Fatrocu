@@ -45,7 +45,6 @@ export const App: React.FC = () => {
     setTimeout(() => setAlert(null), 5000);
   };
 
-  // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
@@ -65,7 +64,6 @@ export const App: React.FC = () => {
     })();
   }, []);
 
-  // ── Processing ────────────────────────────────────────────────────────────
   const handleFilesSelected = async (files: File[]) => {
     const cfg = configs.find((c) => c.id === activeConfigId) || configs[0];
     setIsProcessing(true);
@@ -91,16 +89,15 @@ export const App: React.FC = () => {
     }
 
     setIsProcessing(false);
-    showAlert('success', `${files.length} belge işlendi.`);
+    showAlert('success', `${files.length} fatura başarıyla çözümlendi!`);
     setPage('review');
   };
 
-  // ── Invoice CRUD ──────────────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
     await tauriService.deleteInvoice(id);
     setInvoices((p) => p.filter((i) => i.id !== id));
     if (selectedId === id) { setSelectedId(null); setPage('review'); }
-    showAlert('info', 'Belge silindi.');
+    showAlert('info', 'Fatura silindi.');
   };
 
   const handleSave = async (
@@ -116,8 +113,8 @@ export const App: React.FC = () => {
     };
     await tauriService.saveInvoice(updated);
     setInvoices((p) => p.map((i) => (i.id === id ? updated : i)));
-    if (approve) showAlert('success', `"${existing.fileName}" onaylandı.`);
-    else showAlert('info', 'Kaydedildi.');
+    if (approve) showAlert('success', `"${existing.fileName}" onaylandı ve arşive eklendi.`);
+    else showAlert('info', 'Değişiklikler kaydedildi.');
   };
 
   const handleSaveAndNext = async (
@@ -131,39 +128,37 @@ export const App: React.FC = () => {
     } else {
       setSelectedId(null);
       setPage('approved');
-      showAlert('success', 'Tüm bekleyen belgeler onaylandı!');
+      showAlert('success', 'Tebrikler! Kuyruktaki tüm faturalar onaylandı.');
     }
   };
 
   const handleClearApproved = async () => {
-    if (!window.confirm('Tüm onaylanmış belgeler silinecek. Onaylıyor musunuz?')) return;
+    if (!window.confirm('Tüm onaylanmış faturalar arşivden silinecek. Emin misiniz?')) return;
     for (const inv of invoices.filter((i) => i.reviewStatus === 'reviewed')) {
       await tauriService.deleteInvoice(inv.id);
     }
     setInvoices((p) => p.filter((i) => i.reviewStatus !== 'reviewed'));
-    showAlert('info', 'Onaylanmış belgeler temizlendi.');
+    showAlert('info', 'Arşiv temizlendi.');
   };
 
-  // ── Export ────────────────────────────────────────────────────────────────
   const handleExportExcel = async () => {
     const toExport = invoices.filter((i) => i.reviewStatus === 'reviewed');
-    if (toExport.length === 0) { showAlert('warning', 'Dışa aktarılacak onaylı belge yok.'); return; }
+    if (toExport.length === 0) { showAlert('warning', 'Dışa aktarılacak onaylanmış belge bulunamadı.'); return; }
     try {
       const path = await tauriService.exportInvoicesExcel(toExport, configs);
-      showAlert('success', `Excel kaydedildi: ${path}`);
+      showAlert('success', `Excel dosyası kaydedildi: ${path}`);
     } catch (e) { showAlert('error', `Excel hatası: ${e}`); }
   };
 
   const handleExportCsv = async () => {
     const toExport = invoices.filter((i) => i.reviewStatus === 'reviewed');
-    if (toExport.length === 0) { showAlert('warning', 'Dışa aktarılacak onaylı belge yok.'); return; }
+    if (toExport.length === 0) { showAlert('warning', 'Dışa aktarılacak onaylanmış belge bulunamadı.'); return; }
     try {
       const path = await tauriService.exportInvoicesCsv(toExport, configs);
-      showAlert('success', `CSV kaydedildi: ${path}`);
+      showAlert('success', `CSV dosyası kaydedildi: ${path}`);
     } catch (e) { showAlert('error', `CSV hatası: ${e}`); }
   };
 
-  // ── Derived state ─────────────────────────────────────────────────────────
   const pending = invoices.filter((i) => i.reviewStatus !== 'reviewed');
   const approved = invoices.filter((i) => i.reviewStatus === 'reviewed');
   const selectedInvoice = invoices.find((i) => i.id === selectedId);
@@ -172,7 +167,7 @@ export const App: React.FC = () => {
   const navPage = page === 'check' ? 'review' : page;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0a', display: 'flex', flexDirection: 'column' }}>
+    <div className="min-h-screen bg-white text-black flex flex-col font-sans">
       <Header
         currentPage={navPage as any}
         setCurrentPage={(p) => { setSelectedId(null); setPage(p); }}
@@ -181,7 +176,7 @@ export const App: React.FC = () => {
         modelStatus={modelStatus}
       />
 
-      <main style={{ flex: 1, maxWidth: 1100, width: '100%', margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
         {alert && (
           <AlertMessage type={alert.type} message={alert.message} onClose={() => setAlert(null)} />
         )}
@@ -197,6 +192,7 @@ export const App: React.FC = () => {
             recentInvoices={invoices}
             onViewDetails={(id) => { setSelectedId(id); setPage('check'); }}
             onDeleteInvoice={handleDelete}
+            onNavigateToReview={() => setPage('review')}
           />
         )}
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AppSettings, InvoiceConfig, ModelStatus, FieldConfig, GemmaVariant } from '../types';
-import { Plus, Trash2, ChevronDown, Info } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, Info, Cpu, HardDrive, Sliders, CheckCircle2, Bookmark } from 'lucide-react';
 
 interface SettingsPageProps {
   settings: AppSettings;
@@ -10,11 +10,11 @@ interface SettingsPageProps {
   modelStatus: ModelStatus | null;
 }
 
-const GEMMA_MODELS: { id: GemmaVariant; label: string; size: string; note?: string }[] = [
-  { id: 'E2B',    label: 'Gemma 4 E2B',  size: '~1.4 GB', note: 'Hızlı, düşük VRAM' },
-  { id: 'E4B',    label: 'Gemma 4 E4B',  size: '~2.8 GB', note: 'Varsayılan — önerilen' },
-  { id: '12B',    label: 'Gemma 4 12B',  size: '~7.5 GB', note: 'En yüksek doğruluk' },
-  { id: 'custom', label: 'Özel GGUF',    size: '—',       note: 'Kendi modelini ekle' },
+const GEMMA_MODELS: { id: GemmaVariant; label: string; size: string; note: string; badge?: string }[] = [
+  { id: 'E4B', label: 'Gemma 4 E4B', size: '~2.8 GB GGUF', note: 'Varsayılan & Önerilen model. Hızlı ve dengeli.', badge: 'ÖNERİLEN' },
+  { id: 'E2B', label: 'Gemma 4 E2B', size: '~1.4 GB GGUF', note: 'Ultra hafif, düşük RAM/VRAM cihazlar için ideal.' },
+  { id: '12B', label: 'Gemma 4 12B', size: '~7.5 GB GGUF', note: 'Karmaşık çok sayfalı tablolar ve en yüksek doğruluk.' },
+  { id: 'custom', label: 'Özel GGUF Model İçe Aktar', size: 'Kullanıcı seçimi', note: 'Kendi yerel GGUF model dosyanızı ekleyin.' },
 ];
 
 type Section = 'models' | 'templates' | 'advanced';
@@ -38,9 +38,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setTimeout(() => setSaved(false), 2000);
   };
 
-  // ── Template helpers ─────────────────────────────────────────────────────
   const addConfig = () => {
-    const name = window.prompt('Şablon adı:'); if (!name) return;
+    const name = window.prompt('Yeni Şablon Adı:'); if (!name) return;
     const cfg: InvoiceConfig = {
       id: `cfg_${Date.now()}`, name, isPredefined: false,
       fields: [{ key: 'faturaNumarasi', label: 'Fatura No' }],
@@ -57,7 +56,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setLocalConfigs((p) => p.map((c, i) => i === idx ? { ...c, ...patch } : c));
 
   const addField = (configIdx: number, type: 'fields' | 'lineItemFields') => {
-    const label = window.prompt('Alan adı:'); if (!label) return;
+    const label = window.prompt('Alan Adı:'); if (!label) return;
     const key = label.toLowerCase().replace(/\s+/g, '_') + Date.now().toString().slice(-4);
     const cfg = localConfigs[configIdx];
     updateConfig(configIdx, { [type]: [...(cfg[type] || []), { key, label }] });
@@ -68,245 +67,434 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     updateConfig(configIdx, { [type]: (cfg[type] || []).filter((f: FieldConfig) => f.key !== fieldKey) });
   };
 
-  // ── Styles ───────────────────────────────────────────────────────────────
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-    fontSize: 12, fontWeight: active ? 600 : 400,
-    background: active ? '#1a1a1a' : 'transparent',
-    color: active ? '#fff' : '#555',
-  });
-
-  const label: React.CSSProperties = { fontSize: 11, color: '#444', fontWeight: 600, display: 'block', marginBottom: 5, letterSpacing: '0.04em' };
-  const inp: React.CSSProperties = { width: '100%', background: '#0f0f0f', border: '1px solid #1f1f1f', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: '#ccc', outline: 'none' };
-  const row: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 5 };
-
   return (
-    <div className="fade-in" style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>Ayarlar</h1>
+    <div className="fade-in max-w-5xl mx-auto flex flex-col gap-8 pb-16">
+      
+      {/* Top Banner */}
+      <div className="scribble-card p-6 bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <div>
+          <h1 className="font-heading font-black text-2xl text-black">
+            Uygulama ve Model Ayarları
+          </h1>
+          <p className="font-scribble text-sm text-neutral-600 font-semibold mt-1">
+            llama.cpp motoru, DeepSeek-OCR, Gemma 4 ve özel fatura şablonlarınızı yönetin.
+          </p>
+        </div>
+
         <button
           onClick={save}
-          style={{ padding: '7px 18px', background: saved ? '#1a1a1a' : '#fff', color: saved ? '#4ade80' : '#000', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}
+          className={`scribble-btn px-6 py-3 text-sm flex items-center gap-2 ${
+            saved ? 'bg-black text-white' : 'scribble-btn-primary'
+          }`}
         >
-          {saved ? '✓ Kaydedildi' : 'Kaydet'}
+          <CheckCircle2 size={18} className="stroke-[3]" />
+          <span>{saved ? 'Kaydedildi!' : 'Değişiklikleri Kaydet'}</span>
         </button>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2 }}>
-        {(['models', 'templates', 'advanced'] as Section[]).map((s) => (
-          <button key={s} onClick={() => setSection(s)} style={tabStyle(section === s)}>
-            {s === 'models' ? 'Model Yönetimi' : s === 'templates' ? 'Şablonlar' : 'Gelişmiş'}
-          </button>
-        ))}
+      {/* Nav Tabs */}
+      <div className="flex items-center gap-3">
+        {(['models', 'templates', 'advanced'] as Section[]).map((s) => {
+          const active = section === s;
+          const label = s === 'models' ? '1. Model Yönetimi (Gemma / OCR)' : s === 'templates' ? '2. Fatura Şablonları' : '3. Donanım & Çıktı';
+          return (
+            <button
+              key={s}
+              onClick={() => setSection(s)}
+              className={`px-5 py-2.5 rounded-xl border-2 border-black font-heading font-bold text-xs uppercase tracking-wider transition-all ${
+                active
+                  ? 'bg-black text-white shadow-[3px_3px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
+                  : 'bg-white text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000]'
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* ── Model Management ─────────────────────────────────────────────── */}
+      {/* SECTION: Models */}
       {section === 'models' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Info banner */}
-          <div className="card" style={{ padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <Info size={14} color="#555" style={{ flexShrink: 0, marginTop: 1 }} />
-            <div>
-              <div style={{ fontSize: 12, color: '#888', fontWeight: 600, marginBottom: 4 }}>Pipeline: DeepSeek-OCR → Gemma 4</div>
-              <div style={{ fontSize: 11, color: '#444', lineHeight: 1.6 }}>
-                Görsel/PDF → DeepSeek-OCR (Markdown) → Gemma 4 (yapılandırılmış JSON çıkarma).<br />
-                Tüm modeller llama.cpp GGUF formatıyla çalışır — GPU/CPU cihazlarında çalışır.
+        <div className="space-y-6">
+          
+          {/* Architecture notice card */}
+          <div className="scribble-card p-5 bg-white border-2 border-black flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl border-2 border-black bg-neutral-100 flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+              <Info size={20} className="text-black stroke-[2.5]" />
+            </div>
+            <div className="space-y-1">
+              <span className="font-heading font-black text-sm text-black block">
+                İki Aşamalı Saf llama.cpp Pipeline (NVIDIA Bağımsız)
+              </span>
+              <p className="font-scribble text-xs text-neutral-600 font-semibold leading-relaxed">
+                1. <strong>DeepSeek-OCR GGUF:</strong> Görsel/PDF dosyasını tabloları ve konumları koruyarak ham markdown'a dönüştürür.<br />
+                2. <strong>Gemma 4 GGUF:</strong> Markdown metnini okuyarak fatura no, tarih, VKN, KDV ve tutar alanlarını JSON olarak ayıklar.
+              </p>
+            </div>
+          </div>
+
+          {/* DeepSeek OCR Path */}
+          <div className="scribble-card p-6 bg-white space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b-2 border-black">
+              <HardDrive size={20} className="text-black stroke-[2.5]" />
+              <h3 className="font-heading font-black text-base text-black uppercase tracking-wider">
+                Adım 1: DeepSeek-OCR (GGUF) Motoru
+              </h3>
+            </div>
+
+            <div className="space-y-2">
+              <label className="font-heading font-bold text-xs text-neutral-700 block">
+                Model Dosyası Yolu veya HuggingFace Repo
+              </label>
+              <input
+                type="text"
+                placeholder="Örnek: models/DeepSeek-OCR-GGUF/deepseek-ocr.gguf"
+                value={local.ocrModelPath}
+                onChange={(e) => set('ocrModelPath', e.target.value)}
+                className="w-full font-heading font-bold text-sm"
+              />
+              <span className="font-scribble text-xs text-neutral-500 font-bold block">
+                * NexaAI/DeepSeek-OCR-GGUF formatındaki model dosyası.
+              </span>
+            </div>
+          </div>
+
+          {/* Gemma 4 Assistant Selection */}
+          <div className="scribble-card p-6 bg-white space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b-2 border-black">
+              <div className="flex items-center gap-2">
+                <Cpu size={20} className="text-black stroke-[2.5]" />
+                <h3 className="font-heading font-black text-base text-black uppercase tracking-wider">
+                  Adım 2: Gemma 4 Alan Çıkarma Asistanı
+                </h3>
               </div>
+              <span className="scribble-tag text-xs font-scribble bg-black text-white px-2 py-0.5 rounded">
+                SADECE ALAN ÇIKARMA GÖREVİNDE
+              </span>
             </div>
-          </div>
 
-          {/* OCR Model */}
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#444', letterSpacing: '0.05em', marginBottom: 12 }}>OCR MOTORU — DeepSeek-OCR</div>
-            <div style={row}>
-              <span style={label}>Model Yolu (GGUF)</span>
-              <input style={inp} placeholder="Ör: models/deepseek-ocr-q4.gguf" value={local.ocrModelPath} onChange={(e) => set('ocrModelPath', e.target.value)} />
-              <span style={{ fontSize: 11, color: '#333' }}>Faz 2'de model indirme sistemi entegre edilecek. Şimdilik yolu elle girin.</span>
-            </div>
-          </div>
-
-          {/* Extraction Model */}
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#444', letterSpacing: '0.05em', marginBottom: 12 }}>ÇIKARMA ASİSTANI — Gemma 4 GGUF</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-              {GEMMA_MODELS.map(({ id, label: l, size, note }) => {
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {GEMMA_MODELS.map(({ id, label: l, size, note, badge }) => {
                 const active = local.extractionModelId === id;
                 return (
-                  <button
+                  <div
                     key={id}
                     onClick={() => set('extractionModelId', id)}
-                    style={{
-                      padding: '10px 12px', borderRadius: 7, border: `1px solid ${active ? '#555' : '#1a1a1a'}`,
-                      background: active ? '#1a1a1a' : '#0d0d0d', cursor: 'pointer', textAlign: 'left',
-                      transition: 'all 0.12s',
-                    }}
+                    className={`p-4 rounded-xl border-[2.5px] cursor-pointer transition-all bg-white flex flex-col justify-between ${
+                      active
+                        ? 'border-black shadow-[4px_4px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
+                        : 'border-black/60 shadow-[2px_2px_0px_#000] hover:border-black'
+                    }`}
                   >
-                    <div style={{ fontSize: 12, fontWeight: active ? 700 : 500, color: active ? '#fff' : '#666' }}>{l}</div>
-                    <div style={{ fontSize: 10, color: '#444', marginTop: 2 }}>{size} · {note}</div>
-                    {id === 'E4B' && <div style={{ fontSize: 10, color: '#555', marginTop: 2 }}>● Varsayılan</div>}
-                  </button>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-heading font-extrabold text-base text-black">
+                          {l}
+                        </span>
+                        {badge && (
+                          <span className="scribble-badge bg-black text-white text-[10px] font-scribble px-2 py-0.5">
+                            {badge}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-scribble text-xs font-bold text-neutral-500 block">
+                        Boyut: {size}
+                      </span>
+                      <p className="font-scribble text-xs text-neutral-700 font-semibold pt-1">
+                        {note}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-2 border-t border-black/10 flex items-center justify-between">
+                      <span className="text-[11px] font-heading font-extrabold text-neutral-500">
+                        {active ? '● Seçili Model' : 'Seçmek için tıkla'}
+                      </span>
+                      <div className={`w-4 h-4 rounded-full border-2 border-black flex items-center justify-center ${active ? 'bg-black' : 'bg-white'}`}>
+                        {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
             </div>
+
             {local.extractionModelId === 'custom' && (
-              <div style={row}>
-                <span style={label}>Özel Model Yolu</span>
-                <input style={inp} placeholder="Ör: models/custom-model-q4.gguf" value={local.extractionModelPath} onChange={(e) => set('extractionModelPath', e.target.value)} />
+              <div className="mt-4 p-4 border-2 border-black rounded-xl bg-neutral-50 space-y-2">
+                <label className="font-heading font-bold text-xs text-black block">
+                  Özel GGUF Model Dosya Yolu:
+                </label>
+                <input
+                  type="text"
+                  placeholder="C:/Modellerim/benim-modelim-q4_k_m.gguf"
+                  value={local.extractionModelPath}
+                  onChange={(e) => set('extractionModelPath', e.target.value)}
+                  className="w-full font-heading font-bold text-sm bg-white"
+                />
               </div>
             )}
           </div>
 
-          {/* GPU layers */}
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#444', letterSpacing: '0.05em', marginBottom: 12 }}>DONANIM</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div style={row}>
-                <span style={label}>OCR GPU Katmanları (0 = CPU)</span>
-                <input type="number" min={0} max={100} style={inp} value={local.ocrGpuLayers} onChange={(e) => set('ocrGpuLayers', Number(e.target.value))} />
-              </div>
-              <div style={row}>
-                <span style={label}>Çıkarma GPU Katmanları</span>
-                <input type="number" min={0} max={100} style={inp} value={local.extractionGpuLayers} onChange={(e) => set('extractionGpuLayers', Number(e.target.value))} />
-              </div>
-              <div style={row}>
-                <span style={label}>OCR Thread Sayısı</span>
-                <input type="number" min={1} max={32} style={inp} value={local.ocrThreads} onChange={(e) => set('ocrThreads', Number(e.target.value))} />
-              </div>
-              <div style={row}>
-                <span style={label}>Çıkarma Thread Sayısı</span>
-                <input type="number" min={1} max={32} style={inp} value={local.extractionThreads} onChange={(e) => set('extractionThreads', Number(e.target.value))} />
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* ── Templates ────────────────────────────────────────────────────── */}
+      {/* SECTION: Templates */}
       {section === 'templates' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div className="space-y-4">
+          <div className="flex justify-end">
             <button
               onClick={addConfig}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#1a1a1a', border: '1px solid #222', borderRadius: 6, fontSize: 12, color: '#888', cursor: 'pointer' }}
+              className="scribble-btn scribble-btn-primary text-xs px-4 py-2 shadow-[2px_2px_0px_#000] flex items-center gap-1.5"
             >
-              <Plus size={12} /> Yeni Şablon
+              <Plus size={16} className="stroke-[3]" />
+              <span>Yeni Şablon Oluştur</span>
             </button>
           </div>
-          {localConfigs.map((cfg, ci) => (
-            <div key={cfg.id} className="card" style={{ overflow: 'hidden' }}>
-              {/* Config header */}
-              <div
-                style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', cursor: 'pointer', gap: 10 }}
-                onClick={() => setEditConfigIdx(editConfigIdx === ci ? null : ci)}
-              >
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#ccc' }}>{cfg.name}</span>
-                <span style={{ fontSize: 11, color: '#444' }}>{cfg.fields.length} alan</span>
-                {cfg.isPredefined && <span style={{ fontSize: 10, color: '#333', background: '#1a1a1a', padding: '2px 6px', borderRadius: 4 }}>Varsayılan</span>}
-                {!cfg.isPredefined && (
-                  <button onClick={(e) => { e.stopPropagation(); deleteConfig(ci); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333' }}>
-                    <Trash2 size={13} />
-                  </button>
-                )}
-                <ChevronDown size={13} color="#444" style={{ transform: editConfigIdx === ci ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-              </div>
 
-              {/* Config editor */}
-              {editConfigIdx === ci && (
-                <div style={{ padding: '0 14px 14px', borderTop: '1px solid #1a1a1a' }}>
-                  <div style={{ marginTop: 12, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 11, color: '#444', fontWeight: 600, letterSpacing: '0.05em' }}>ALANLAR</span>
-                    <button onClick={() => addField(ci, 'fields')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#444', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <Plus size={11} /> Ekle
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {cfg.fields.map((f) => (
-                      <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: '#0d0d0d', borderRadius: 5 }}>
-                        <span style={{ flex: 1, fontSize: 12, color: '#666' }}>{f.label}</span>
-                        <span style={{ fontSize: 11, color: '#333', fontFamily: 'monospace' }}>{f.key}</span>
-                        {!cfg.isPredefined && (
-                          <button onClick={() => removeField(ci, 'fields', f.key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333' }}>
-                            <Trash2 size={11} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
+          <div className="space-y-4">
+            {localConfigs.map((cfg, ci) => (
+              <div key={cfg.id} className="scribble-card bg-white overflow-hidden">
+                <div
+                  onClick={() => setEditConfigIdx(editConfigIdx === ci ? null : ci)}
+                  className="p-5 flex items-center justify-between cursor-pointer hover:bg-neutral-50 transition-colors select-none"
+                >
+                  <div className="flex items-center gap-3">
+                    <Bookmark size={20} className="text-black stroke-[2.5]" />
+                    <div>
+                      <span className="font-heading font-black text-base text-black block">
+                        {cfg.name}
+                      </span>
+                      <span className="font-scribble text-xs text-neutral-500 font-bold block">
+                        {cfg.fields.length} temel alan, {(cfg.lineItemFields || []).length} kalem sütunu
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Line item fields */}
-                  <div style={{ marginTop: 12, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 11, color: '#444', fontWeight: 600, letterSpacing: '0.05em' }}>KALEM SÜTUNLARI</span>
-                    <button onClick={() => addField(ci, 'lineItemFields')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#444', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <Plus size={11} /> Ekle
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {(cfg.lineItemFields || []).map((f) => (
-                      <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: '#0d0d0d', borderRadius: 5 }}>
-                        <span style={{ flex: 1, fontSize: 12, color: '#666' }}>{f.label}</span>
-                        <span style={{ fontSize: 11, color: '#333', fontFamily: 'monospace' }}>{f.key}</span>
-                        {!cfg.isPredefined && (
-                          <button onClick={() => removeField(ci, 'lineItemFields', f.key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333' }}>
-                            <Trash2 size={11} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    {(cfg.lineItemFields || []).length === 0 && (
-                      <div style={{ fontSize: 11, color: '#333', padding: '6px 8px' }}>Kalem sütunu yok.</div>
+                  <div className="flex items-center gap-3">
+                    {cfg.isPredefined ? (
+                      <span className="scribble-badge bg-neutral-100 text-black text-[11px] font-heading font-bold">
+                        Varsayılan Şablon
+                      </span>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteConfig(ci); }}
+                        className="w-8 h-8 rounded-lg border-2 border-black flex items-center justify-center hover:bg-black hover:text-white transition-colors"
+                        title="Şablonu Sil"
+                      >
+                        <Trash2 size={14} className="stroke-[2.5]" />
+                      </button>
                     )}
+                    <ChevronDown
+                      size={20}
+                      className={`text-black stroke-[3] transition-transform ${editConfigIdx === ci ? 'rotate-180' : ''}`}
+                    />
                   </div>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Sub Editor */}
+                {editConfigIdx === ci && (
+                  <div className="p-6 border-t-2 border-black bg-neutral-50 space-y-6">
+                    {/* Fields */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-heading font-black text-xs text-black uppercase tracking-wider">
+                          Belge Alanları
+                        </span>
+                        <button
+                          onClick={() => addField(ci, 'fields')}
+                          className="scribble-btn scribble-btn-secondary text-xs py-1 px-3 shadow-[1.5px_1.5px_0px_#000]"
+                        >
+                          <Plus size={12} className="stroke-[3]" />
+                          <span>Alan Ekle</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                        {cfg.fields.map((f) => (
+                          <div
+                            key={f.key}
+                            className="p-3 rounded-lg border-2 border-black bg-white flex items-center justify-between shadow-[2px_2px_0px_#000]"
+                          >
+                            <div className="truncate mr-2">
+                              <span className="font-heading font-bold text-xs text-black block truncate">
+                                {f.label}
+                              </span>
+                              <span className="font-mono text-[10px] text-neutral-400 block truncate">
+                                {f.key}
+                              </span>
+                            </div>
+                            {!cfg.isPredefined && (
+                              <button
+                                onClick={() => removeField(ci, 'fields', f.key)}
+                                className="text-neutral-400 hover:text-black shrink-0"
+                              >
+                                <Trash2 size={13} className="stroke-[2.5]" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Line Item Columns */}
+                    <div className="space-y-3 pt-4 border-t border-black/20">
+                      <div className="flex items-center justify-between">
+                        <span className="font-heading font-black text-xs text-black uppercase tracking-wider">
+                          Kalem Tablosu Sütunları
+                        </span>
+                        <button
+                          onClick={() => addField(ci, 'lineItemFields')}
+                          className="scribble-btn scribble-btn-secondary text-xs py-1 px-3 shadow-[1.5px_1.5px_0px_#000]"
+                        >
+                          <Plus size={12} className="stroke-[3]" />
+                          <span>Sütun Ekle</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                        {(cfg.lineItemFields || []).map((f) => (
+                          <div
+                            key={f.key}
+                            className="p-3 rounded-lg border-2 border-black bg-white flex items-center justify-between shadow-[2px_2px_0px_#000]"
+                          >
+                            <div className="truncate mr-2">
+                              <span className="font-heading font-bold text-xs text-black block truncate">
+                                {f.label}
+                              </span>
+                              <span className="font-mono text-[10px] text-neutral-400 block truncate">
+                                {f.key}
+                              </span>
+                            </div>
+                            {!cfg.isPredefined && (
+                              <button
+                                onClick={() => removeField(ci, 'lineItemFields', f.key)}
+                                className="text-neutral-400 hover:text-black shrink-0"
+                              >
+                                <Trash2 size={13} className="stroke-[2.5]" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        {(cfg.lineItemFields || []).length === 0 && (
+                          <div className="font-scribble text-xs text-neutral-400 font-bold p-2">
+                            Kalem sütunu tanımlanmamış.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* ── Advanced ──────────────────────────────────────────────────────── */}
+      {/* SECTION: Advanced / Hardware */}
       {section === 'advanced' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={row}>
-              <span style={label}>Varsayılan Dışa Aktarma Formatı</span>
-              <div style={{ position: 'relative' }}>
+        <div className="space-y-6">
+          
+          <div className="scribble-card p-6 bg-white space-y-5">
+            <div className="flex items-center gap-2 pb-2 border-b-2 border-black">
+              <Sliders size={20} className="text-black stroke-[2.5]" />
+              <h3 className="font-heading font-black text-base text-black uppercase tracking-wider">
+                Donanım &amp; llama.cpp Performans Ayarları
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="space-y-2">
+                <label className="font-heading font-bold text-xs text-black block">
+                  DeepSeek-OCR GPU Katman Sayısı
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={local.ocrGpuLayers}
+                  onChange={(e) => set('ocrGpuLayers', Number(e.target.value))}
+                  className="w-full font-heading font-bold text-sm"
+                />
+                <span className="font-scribble text-xs text-neutral-500 font-bold block">
+                  0 = Tamamen CPU modu (GPU gerektirmez)
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-heading font-bold text-xs text-black block">
+                  Gemma 4 GPU Katman Sayısı
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={local.extractionGpuLayers}
+                  onChange={(e) => set('extractionGpuLayers', Number(e.target.value))}
+                  className="w-full font-heading font-bold text-sm"
+                />
+                <span className="font-scribble text-xs text-neutral-500 font-bold block">
+                  0 = Saf CPU çıkarımı
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-heading font-bold text-xs text-black block">
+                  OCR CPU Thread Sayısı
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={32}
+                  value={local.ocrThreads}
+                  onChange={(e) => set('ocrThreads', Number(e.target.value))}
+                  className="w-full font-heading font-bold text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-heading font-bold text-xs text-black block">
+                  Çıkarma CPU Thread Sayısı
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={32}
+                  value={local.extractionThreads}
+                  onChange={(e) => set('extractionThreads', Number(e.target.value))}
+                  className="w-full font-heading font-bold text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="scribble-card p-6 bg-white space-y-4">
+            <h3 className="font-heading font-black text-base text-black uppercase tracking-wider pb-2 border-b-2 border-black">
+              Dışa Aktarma Tercihleri
+            </h3>
+
+            <div className="space-y-2 max-w-sm">
+              <label className="font-heading font-bold text-xs text-black block">
+                Varsayılan Rapor Formatı
+              </label>
+              <div className="relative">
                 <select
                   value={local.defaultExportFormat}
                   onChange={(e) => set('defaultExportFormat', e.target.value as 'xlsx' | 'csv')}
-                  style={{ ...inp, appearance: 'none', paddingRight: 28 }}
+                  className="w-full font-heading font-bold text-sm appearance-none pr-10"
                 >
-                  <option value="xlsx">Excel (.xlsx)</option>
-                  <option value="csv">CSV (.csv)</option>
+                  <option value="xlsx">Excel Tablosu (.xlsx)</option>
+                  <option value="csv">CSV Metin Dosyası (.csv)</option>
                 </select>
-                <ChevronDown size={13} color="#555" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                <ChevronDown
+                  size={18}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-black stroke-[3]"
+                />
               </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: 12, color: '#888', fontWeight: 600 }}>İşlenen dosyaları kaydet</div>
-                <div style={{ fontSize: 11, color: '#444' }}>Fatura görselleri ve veriler %APPDATA%\Fatrocu altına kaydedilir.</div>
-              </div>
-              <button
-                onClick={() => set('saveProcessedFiles', !local.saveProcessedFiles)}
-                style={{
-                  width: 36, height: 20, borderRadius: 99, border: 'none', cursor: 'pointer',
-                  background: local.saveProcessedFiles ? '#fff' : '#1a1a1a',
-                  position: 'relative', flexShrink: 0,
-                }}
-              >
-                <div style={{
-                  position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%',
-                  background: local.saveProcessedFiles ? '#000' : '#444',
-                  left: local.saveProcessedFiles ? 18 : 2,
-                  transition: 'left 0.15s',
-                }} />
-              </button>
             </div>
           </div>
+
         </div>
       )}
+
     </div>
   );
 };

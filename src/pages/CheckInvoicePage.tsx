@@ -6,6 +6,7 @@ import {
 import { DocumentViewer } from '../components/DocumentViewer';
 import {
   ArrowLeft, Check, ChevronLeft, ChevronRight, Save, Plus, Trash2,
+  FileCheck, HelpCircle, Layers, CheckCircle2
 } from 'lucide-react';
 
 interface CheckInvoicePageProps {
@@ -58,14 +59,14 @@ export const CheckInvoicePage: React.FC<CheckInvoicePageProps> = ({
     setLineItems((p) => p.map((r, i) => i === idx ? { ...r, [key]: { ...r[key], value } } : r));
 
   const addMainField = () => {
-    const label = window.prompt('Alan adı:'); if (!label) return;
+    const label = window.prompt('Yeni Alan Adı:'); if (!label) return;
     const key = toKey(label);
     setCustomFields((p) => [...p, { key, label }]);
     setFormData((p) => ({ ...p, [key]: { value: '' } }));
   };
 
   const addLineCol = () => {
-    const label = window.prompt('Sütun adı:'); if (!label) return;
+    const label = window.prompt('Yeni Kalem Sütun Adı:'); if (!label) return;
     const key = toKey(label);
     setCustomLineItemFields((p) => [...p, { key, label }]);
     setLineItems((p) => p.map((r) => ({ ...r, [key]: { value: '' } })));
@@ -93,72 +94,81 @@ export const CheckInvoicePage: React.FC<CheckInvoicePageProps> = ({
     else onSave(invoice.id, formData, lineItems, customFields, customLineItemFields);
   };
 
-  // ── input style helper ───────────────────────────────────────────────────
-  const inp = (active: boolean): React.CSSProperties => ({
-    width: '100%',
-    background: active ? '#181818' : '#0f0f0f',
-    border: `1px solid ${active ? '#444' : '#1f1f1f'}`,
-    borderRadius: 5,
-    padding: '5px 8px',
-    fontSize: 12,
-    color: '#ddd',
-    outline: 'none',
-    transition: 'border-color 0.12s',
-  });
-
-  const btn = (primary: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 5,
-    padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-    fontSize: 12, fontWeight: 700,
-    background: primary ? '#fff' : '#1a1a1a',
-    color: primary ? '#000' : '#888',
-    transition: 'opacity 0.1s',
-  });
-
   return (
-    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 12, height: 'calc(100vh - 80px)' }}>
-      {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <button onClick={onBack} style={{ ...btn(false), gap: 4 }}>
-          <ArrowLeft size={13} /> Geri
-        </button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {invoice.fileName}
+    <div className="fade-in flex flex-col gap-5 h-[calc(100vh-120px)] min-h-[650px] pb-4">
+      
+      {/* Top Controller Bar */}
+      <div className="scribble-card p-4 bg-white flex flex-wrap items-center justify-between gap-4 shrink-0">
+        
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={onBack}
+            className="scribble-btn scribble-btn-secondary px-3.5 py-2 text-xs flex items-center gap-1.5 shadow-[2px_2px_0px_#000]"
+          >
+            <ArrowLeft size={16} className="stroke-[3]" />
+            <span>Listeye Dön</span>
+          </button>
+
+          <div className="min-w-0">
+            <h3 className="font-heading font-black text-base text-black truncate max-w-sm">
+              {invoice.fileName}
+            </h3>
+            <span className="font-scribble text-xs text-neutral-600 font-bold block -mt-0.5">
+              Şablon: {config.name}
+            </span>
           </div>
-          <div style={{ fontSize: 11, color: '#444' }}>{config.name}</div>
         </div>
 
-        {pendingReviewIds.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#111', border: '1px solid #1f1f1f', borderRadius: 6, padding: '4px 8px' }}>
-            <button
-              disabled={!hasPrev}
-              onClick={() => onNavigateToInvoice(pendingReviewIds[idx - 1])}
-              style={{ background: 'none', border: 'none', cursor: hasPrev ? 'pointer' : 'default', color: hasPrev ? '#666' : '#222', padding: 2 }}
-            ><ChevronLeft size={13} /></button>
-            <span style={{ fontSize: 11, color: '#444', fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'center' }}>
-              {idx + 1} / {pendingReviewIds.length}
-            </span>
-            <button
-              disabled={!hasNext}
-              onClick={() => onNavigateToInvoice(pendingReviewIds[idx + 1])}
-              style={{ background: 'none', border: 'none', cursor: hasNext ? 'pointer' : 'default', color: hasNext ? '#666' : '#222', padding: 2 }}
-            ><ChevronRight size={13} /></button>
-          </div>
-        )}
+        {/* Pager & Action CTA Buttons */}
+        <div className="flex items-center gap-3">
+          {pendingReviewIds.length > 1 && (
+            <div className="flex items-center bg-neutral-100 border-2 border-black rounded-xl p-1 shadow-[2px_2px_0px_#000] gap-1">
+              <button
+                disabled={!hasPrev}
+                onClick={() => onNavigateToInvoice(pendingReviewIds[idx - 1])}
+                className="p-1.5 hover:bg-white disabled:opacity-30 rounded-lg text-black transition-colors"
+                title="Önceki Fatura"
+              >
+                <ChevronLeft size={16} className="stroke-[3]" />
+              </button>
+              <span className="font-heading font-black text-xs px-2 text-black font-mono">
+                {idx + 1} / {pendingReviewIds.length}
+              </span>
+              <button
+                disabled={!hasNext}
+                onClick={() => onNavigateToInvoice(pendingReviewIds[idx + 1])}
+                className="p-1.5 hover:bg-white disabled:opacity-30 rounded-lg text-black transition-colors"
+                title="Sonraki Fatura"
+              >
+                <ChevronRight size={16} className="stroke-[3]" />
+              </button>
+            </div>
+          )}
 
-        <button onClick={() => submit(false)} style={btn(false)}>
-          <Save size={13} /> Kaydet
-        </button>
-        <button onClick={() => submit(true)} style={btn(true)}>
-          <Check size={13} /> Onayla
-        </button>
+          <button
+            onClick={() => submit(false)}
+            className="scribble-btn scribble-btn-secondary px-4 py-2.5 text-xs flex items-center gap-2 shadow-[2.5px_2.5px_0px_#000]"
+          >
+            <Save size={16} className="stroke-[2.5]" />
+            <span>Kaydet</span>
+          </button>
+
+          <button
+            onClick={() => submit(true)}
+            className="scribble-btn scribble-btn-primary px-6 py-2.5 text-xs flex items-center gap-2 shadow-[3px_3px_0px_#000]"
+          >
+            <Check size={16} className="stroke-[3]" />
+            <span>Onayla ve İlerle</span>
+          </button>
+        </div>
+
       </div>
 
-      {/* Split pane */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, flex: 1, minHeight: 0 }}>
-        {/* Document viewer */}
-        <div style={{ minHeight: 0 }}>
+      {/* Main Split Grid (50% Viewer, 50% Form) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
+        
+        {/* Left Column: Hand-drawn Document Viewer */}
+        <div className="lg:col-span-6 h-full min-h-0 flex flex-col">
           {invoice.previewImageBase64 ? (
             <DocumentViewer
               imageSrc={invoice.previewImageBase64}
@@ -168,45 +178,78 @@ export const CheckInvoicePage: React.FC<CheckInvoicePageProps> = ({
               onSelectField={(k) => setFocusedKey(k)}
             />
           ) : (
-            <div className="card" style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: 12 }}>
-              Önizleme yok
+            <div className="scribble-card bg-white h-full flex items-center justify-center font-scribble font-bold text-neutral-500 text-sm">
+              Önizleme görseli yüklenemedi.
             </div>
           )}
         </div>
 
-        {/* Form panel */}
-        <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Main fields */}
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#444', letterSpacing: '0.05em' }}>ALANLAR</span>
-              <button onClick={addMainField} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#444', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
-                <Plus size={12} /> Alan Ekle
+        {/* Right Column: Structured Data Form with large tactile inputs */}
+        <div className="lg:col-span-6 h-full min-h-0 overflow-y-auto pr-1 flex flex-col gap-5">
+          
+          {/* Main Document Fields Box */}
+          <div className="scribble-card p-6 bg-white space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b-[2.5px] border-black">
+              <div className="flex items-center gap-2">
+                <FileCheck size={20} className="text-black stroke-[2.5]" />
+                <h4 className="font-heading font-black text-base text-black uppercase tracking-wider">
+                  Temel Fatura Bilgileri
+                </h4>
+              </div>
+              <button
+                onClick={addMainField}
+                className="scribble-btn scribble-btn-secondary text-xs px-3 py-1.5 shadow-[2px_2px_0px_#000] flex items-center gap-1"
+              >
+                <Plus size={14} className="stroke-[3]" />
+                <span>Alan Ekle</span>
               </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {allMain.map((field) => {
                 const isCustom = customFields.some((cf) => cf.key === field.key);
                 const active = focusedKey === field.key;
+                const hasPoly = formData[field.key]?.boundingPoly && formData[field.key]!.boundingPoly!.length >= 3;
+
                 return (
-                  <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <label style={{ fontSize: 11, color: active ? '#888' : '#444', fontWeight: 500 }}>
+                  <div
+                    key={field.key}
+                    className={`p-3.5 rounded-xl border-[2px] transition-all bg-white ${
+                      active
+                        ? 'border-black shadow-[4px_4px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
+                        : 'border-black/70 shadow-[2px_2px_0px_#000] hover:border-black'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="font-heading font-extrabold text-xs text-black block truncate">
                         {field.label}
                       </label>
-                      {isCustom && (
-                        <button onClick={() => removeCustomField(field.key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333', padding: 0 }}>
-                          <Trash2 size={11} />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {hasPoly && (
+                          <span
+                            className="w-2.5 h-2.5 rounded-full border border-black bg-black"
+                            title="Görselde koordinatı işaretlendi"
+                          />
+                        )}
+                        {isCustom && (
+                          <button
+                            onClick={() => removeCustomField(field.key)}
+                            className="text-neutral-400 hover:text-black p-0.5"
+                            title="Alanı Sil"
+                          >
+                            <Trash2 size={13} className="stroke-[2.5]" />
+                          </button>
+                        )}
+                      </div>
                     </div>
+
                     <input
                       type="text"
                       value={formData[field.key]?.value || ''}
                       onFocus={() => setFocusedKey(field.key)}
                       onBlur={() => setFocusedKey(null)}
                       onChange={(e) => onChange(field.key, e.target.value)}
-                      style={inp(active)}
+                      className="w-full font-heading font-bold text-sm bg-neutral-50 border-2 border-black rounded-lg p-2.5 shadow-[2px_2px_0px_#000]"
                     />
                   </div>
                 );
@@ -214,51 +257,68 @@ export const CheckInvoicePage: React.FC<CheckInvoicePageProps> = ({
             </div>
           </div>
 
-          {/* Line items */}
+          {/* Line Items Table with Lined Paper Effect */}
           {allLine.length > 0 && (
-            <div className="card" style={{ padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#444', letterSpacing: '0.05em' }}>
-                  KALEMLER ({lineItems.length})
-                </span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={addLineCol} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#444', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <Plus size={12} /> Sütun
+            <div className="scribble-card p-6 bg-white space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b-[2.5px] border-black">
+                <div className="flex items-center gap-2">
+                  <Layers size={20} className="text-black stroke-[2.5]" />
+                  <h4 className="font-heading font-black text-base text-black uppercase tracking-wider">
+                    Kalemler ve KDV Dökümü ({lineItems.length})
+                  </h4>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={addLineCol}
+                    className="scribble-btn scribble-btn-secondary text-xs px-3 py-1.5 shadow-[2px_2px_0px_#000]"
+                  >
+                    <Plus size={14} className="stroke-[3]" />
+                    <span>Sütun Ekle</span>
                   </button>
-                  <button onClick={addLineRow} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <Plus size={12} /> Satır
+                  <button
+                    onClick={addLineRow}
+                    className="scribble-btn scribble-btn-primary text-xs px-3.5 py-1.5 shadow-[2px_2px_0px_#000]"
+                  >
+                    <Plus size={14} className="stroke-[3]" />
+                    <span>Satır Ekle</span>
                   </button>
                 </div>
               </div>
+
               {lineItems.length > 0 ? (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                <div className="overflow-x-auto rounded-xl border-2 border-black bg-white shadow-[3px_3px_0px_#000]">
+                  <table className="w-full text-left text-xs border-collapse font-heading font-bold">
                     <thead>
-                      <tr>
+                      <tr className="bg-neutral-100 border-b-2 border-black text-black">
                         {allLine.map((f) => (
-                          <th key={f.key} style={{ padding: '6px 8px', textAlign: 'left', color: '#444', fontWeight: 600, borderBottom: '1px solid #1a1a1a', whiteSpace: 'nowrap' }}>
+                          <th key={f.key} className="p-3 uppercase tracking-wider text-xs">
                             {f.label}
                           </th>
                         ))}
-                        <th style={{ width: 28 }} />
+                        <th className="p-3 w-12 text-center">İşlem</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y-2 divide-black/10">
                       {lineItems.map((row, ri) => (
-                        <tr key={ri}>
+                        <tr key={ri} className="hover:bg-neutral-50 transition-colors">
                           {allLine.map((f) => (
-                            <td key={f.key} style={{ padding: '3px 4px' }}>
+                            <td key={f.key} className="p-2.5">
                               <input
                                 type="text"
                                 value={row[f.key]?.value || ''}
                                 onChange={(e) => onLineChange(ri, f.key, e.target.value)}
-                                style={{ width: '100%', background: '#0f0f0f', border: '1px solid #1a1a1a', borderRadius: 4, padding: '3px 6px', fontSize: 11, color: '#ccc', outline: 'none' }}
+                                className="w-full bg-white border-[1.5px] border-black rounded-md p-1.5 font-heading font-semibold text-xs shadow-[1px_1px_0px_#000]"
                               />
                             </td>
                           ))}
-                          <td style={{ padding: '3px 4px', textAlign: 'center' }}>
-                            <button onClick={() => removeLineRow(ri)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333' }}>
-                              <Trash2 size={11} />
+                          <td className="p-2.5 text-center">
+                            <button
+                              onClick={() => removeLineRow(ri)}
+                              className="w-7 h-7 rounded border border-black hover:bg-black hover:text-white inline-flex items-center justify-center transition-colors shadow-[1px_1px_0px_#000]"
+                              title="Satırı Kaldır"
+                            >
+                              <Trash2 size={13} className="stroke-[2.5]" />
                             </button>
                           </td>
                         </tr>
@@ -267,26 +327,30 @@ export const CheckInvoicePage: React.FC<CheckInvoicePageProps> = ({
                   </table>
                 </div>
               ) : (
-                <div style={{ textAlign: 'center', padding: 16, color: '#333', fontSize: 11 }}>
-                  Satır yok — "Satır" düğmesi ile ekleyin.
+                <div className="p-8 border-2 border-dashed border-black rounded-xl text-center font-scribble font-bold text-neutral-500 text-xs">
+                  Henüz satır kalemi eklenmemiş. Yukarıdaki "Satır Ekle" butonuna tıklayabilirsiniz.
                 </div>
               )}
             </div>
           )}
 
-          {/* Raw OCR */}
+          {/* Raw OCR / Markdown collapsible view */}
           {invoice.rawOcr && (
-            <details className="card" style={{ padding: 12 }}>
-              <summary style={{ fontSize: 11, color: '#444', cursor: 'pointer', fontWeight: 600, letterSpacing: '0.05em' }}>
-                HAM OCR METNİ
+            <details className="scribble-card p-4 bg-white group cursor-pointer">
+              <summary className="font-heading font-bold text-xs text-black uppercase tracking-wider select-none list-none flex items-center justify-between">
+                <span>[+] DeepSeek-OCR Ham Markdown Metni</span>
+                <span className="font-scribble text-xs text-neutral-400 font-bold group-open:hidden">Genişlet</span>
               </summary>
-              <pre style={{ marginTop: 10, fontSize: 10, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.6, maxHeight: 200, overflowY: 'auto' }}>
+              <pre className="mt-3 p-4 bg-neutral-50 border-2 border-black rounded-lg text-xs font-mono font-medium text-black whitespace-pre-wrap max-h-48 overflow-y-auto shadow-[inset_2px_2px_0px_#00000010]">
                 {invoice.rawOcr}
               </pre>
             </details>
           )}
+
         </div>
+
       </div>
+
     </div>
   );
 };

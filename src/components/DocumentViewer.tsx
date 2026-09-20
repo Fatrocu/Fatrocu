@@ -1,5 +1,5 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { ZoomIn, ZoomOut, Maximize2, Move } from 'lucide-react';
+import React, { useRef, useState, useCallback } from 'react';
+import { ZoomIn, ZoomOut, Maximize2, Crosshair } from 'lucide-react';
 import { GroundedPoint } from '../types';
 
 interface DocumentViewerProps {
@@ -27,8 +27,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
   const clampOffset = useCallback(
     (x: number, y: number, s: number) => {
-      const maxX = Math.max(0, (imgSize.w * s - (containerRef.current?.clientWidth ?? imgSize.w)) / 2 + 40);
-      const maxY = Math.max(0, (imgSize.h * s - (containerRef.current?.clientHeight ?? imgSize.h)) / 2 + 40);
+      const maxX = Math.max(0, (imgSize.w * s - (containerRef.current?.clientWidth ?? imgSize.w)) / 2 + 60);
+      const maxY = Math.max(0, (imgSize.h * s - (containerRef.current?.clientHeight ?? imgSize.h)) / 2 + 60);
       return { x: Math.max(-maxX, Math.min(maxX, x)), y: Math.max(-maxY, Math.min(maxY, y)) };
     },
     [imgSize]
@@ -36,8 +36,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setScale((s) => Math.max(0.3, Math.min(4, s + delta)));
+    const delta = e.deltaY > 0 ? -0.15 : 0.15;
+    setScale((s) => Math.max(0.3, Math.min(4.5, s + delta)));
   };
 
   const onMouseDown = (e: React.MouseEvent) => {
@@ -59,32 +59,49 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     poly.map((p) => `${p.x * imgSize.w},${p.y * imgSize.h}`).join(' ');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#090909', borderRadius: 10, border: '1px solid #1a1a1a', overflow: 'hidden' }}>
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: '1px solid #1a1a1a', flexShrink: 0 }}>
-        <span style={{ flex: 1, fontSize: 11, color: '#444', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {fileName}
-        </span>
-        {[
-          { Icon: ZoomOut,    action: () => setScale((s) => Math.max(0.3, s - 0.15)), title: 'Uzaklaştır' },
-          { Icon: ZoomIn,     action: () => setScale((s) => Math.min(4, s + 0.15)),   title: 'Yakınlaştır' },
-          { Icon: Maximize2,  action: resetView,                                        title: 'Sıfırla' },
-        ].map(({ Icon, action, title }) => (
+    <div className="scribble-card bg-white h-full flex flex-col overflow-hidden">
+      
+      {/* Top Sketch Toolbar */}
+      <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b-[2.5px] border-black bg-neutral-50 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <Crosshair size={18} className="text-black shrink-0 stroke-[2.5]" />
+          <span className="font-heading font-extrabold text-sm text-black truncate">
+            {fileName}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center bg-white border-2 border-black rounded-lg p-1 shadow-[2px_2px_0px_#000] gap-1">
+            <button
+              onClick={() => setScale((s) => Math.max(0.3, s - 0.2))}
+              className="p-1 hover:bg-neutral-100 rounded text-black transition-colors"
+              title="Uzaklaştır"
+            >
+              <ZoomOut size={16} className="stroke-[2.5]" />
+            </button>
+            <span className="font-heading font-black text-xs px-2 text-black font-mono">
+              {Math.round(scale * 100)}%
+            </span>
+            <button
+              onClick={() => setScale((s) => Math.min(4.5, s + 0.2))}
+              className="p-1 hover:bg-neutral-100 rounded text-black transition-colors"
+              title="Yakınlaştır"
+            >
+              <ZoomIn size={16} className="stroke-[2.5]" />
+            </button>
+          </div>
+
           <button
-            key={title}
-            onClick={action}
-            title={title}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: 4, borderRadius: 4, display: 'flex' }}
+            onClick={resetView}
+            className="p-2 border-2 border-black rounded-lg bg-white hover:bg-neutral-100 shadow-[2px_2px_0px_#000] text-black transition-all"
+            title="Görünümü Sıfırla"
           >
-            <Icon size={13} />
+            <Maximize2 size={16} className="stroke-[2.5]" />
           </button>
-        ))}
-        <span style={{ fontSize: 10, color: '#333', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
-          {Math.round(scale * 100)}%
-        </span>
+        </div>
       </div>
 
-      {/* Canvas */}
+      {/* Canvas Area with Hand-drawn graph paper texture */}
       <div
         ref={containerRef}
         onWheel={onWheel}
@@ -92,17 +109,21 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         onMouseMove={onMouseMove}
         onMouseUp={() => setPanning(false)}
         onMouseLeave={() => setPanning(false)}
+        className="flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing flex items-center justify-center bg-neutral-100/50"
         style={{
-          flex: 1,
-          overflow: 'hidden',
-          position: 'relative',
-          cursor: panning ? 'grabbing' : 'grab',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          backgroundImage: 'linear-gradient(#0000000a 1px, transparent 1px), linear-gradient(90deg, #0000000a 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
         }}
       >
-        <div style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: 'center', position: 'relative', lineHeight: 0 }}>
+        <div
+          style={{
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+            transformOrigin: 'center',
+            position: 'relative',
+            lineHeight: 0,
+          }}
+          className="border-[3px] border-black shadow-[8px_8px_0px_#000] bg-white"
+        >
           <img
             ref={imgRef}
             src={imageSrc.startsWith('data:') ? imageSrc : `data:image/png;base64,${imageSrc}`}
@@ -111,37 +132,39 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               const img = e.currentTarget;
               setImgSize({ w: img.naturalWidth, h: img.naturalHeight });
             }}
-            style={{ display: 'block', maxWidth: '100%', userSelect: 'none', pointerEvents: 'none' }}
+            className="block max-w-none select-none pointer-events-none"
             draggable={false}
           />
 
-          {/* SVG overlays */}
+          {/* SVG coordinate bounding box overlays */}
           {imgSize.w > 1 && (
             <svg
               viewBox={`0 0 ${imgSize.w} ${imgSize.h}`}
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+              className="absolute inset-0 w-full h-full pointer-events-none"
             >
               {allPolygons.map(({ key, poly }) => (
                 <polygon
                   key={key}
                   points={polyToSvg(poly)}
-                  fill="rgba(255,255,255,0.04)"
-                  stroke="rgba(255,255,255,0.25)"
-                  strokeWidth={1.5}
+                  fill="rgba(0,0,0,0.06)"
+                  stroke="#000000"
+                  strokeWidth={2.5}
+                  strokeDasharray="4 2"
                 />
               ))}
               {activePolygon && activePolygon.length >= 3 && (
                 <polygon
                   points={polyToSvg(activePolygon)}
-                  fill="rgba(255,255,255,0.12)"
-                  stroke="#fff"
-                  strokeWidth={2}
+                  fill="rgba(0,0,0,0.18)"
+                  stroke="#000000"
+                  strokeWidth={3.5}
                 />
               )}
             </svg>
           )}
         </div>
       </div>
+
     </div>
   );
 };
