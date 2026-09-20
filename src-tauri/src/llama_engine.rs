@@ -90,47 +90,107 @@ impl LlamaEngine {
         None
     }
 
-    /// Ayarlardaki model dosya yolunu çöz
-    fn resolve_ocr_model_path(settings: &AppSettings) -> Option<PathBuf> {
-        if settings.ocr_model_path.is_empty() {
-            None
-        } else {
-            let p = PathBuf::from(&settings.ocr_model_path);
-            if p.exists() { Some(p) } else { None }
+    /// Projenin gguf dizini veya AppData modelleri veya çalışma dizinindeki modelleri bul
+    fn find_existing_file_by_name(pattern_lower: &str) -> Option<PathBuf> {
+        let mut search_dirs = Vec::new();
+
+        // 1. Proje kök / çalışma dizinindeki gguf/ klasörü
+        search_dirs.push(PathBuf::from("gguf"));
+
+        // 2. Uygulama exe'sinin yanındaki gguf/ veya models/ klasörü
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                search_dirs.push(exe_dir.join("gguf"));
+                search_dirs.push(exe_dir.join("models"));
+            }
         }
+
+        // 3. %APPDATA%\Fatrocu\models klasörü
+        if let Some(data_dir) = dirs::data_dir() {
+            search_dirs.push(data_dir.join("Fatrocu").join("models"));
+            search_dirs.push(data_dir.join("Fatrocu").join("gguf"));
+        }
+
+        for dir in search_dirs {
+            if dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(&dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_file() {
+                            let filename = path.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+                            if filename.ends_with(".gguf") && filename.contains(pattern_lower) {
+                                return Some(path);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Ayarlardaki model dosya yolunu çöz (yoksa gguf/ veya AppData modellerinden otomatik bul)
+    fn resolve_ocr_model_path(settings: &AppSettings) -> Option<PathBuf> {
+        if !settings.ocr_model_path.is_empty() {
+            let p = PathBuf::from(&settings.ocr_model_path);
+            if p.exists() {
+                return Some(p);
+            }
+        }
+
+        // Otomatik arama: "deepseek" veya "ocr" içeren gguf dosyası
+        if let Some(p) = Self::find_existing_file_by_name("deepseek") {
+            return Some(p);
+        }
+        if let Some(p) = Self::find_existing_file_by_name("ocr") {
+            return Some(p);
+        }
+
+        None
     }
 
     fn resolve_extraction_model_path(settings: &AppSettings) -> Option<PathBuf> {
-        let path_str = if settings.extraction_model_id == "custom" {
-            settings.extraction_model_path.clone()
-        } else {
-            // Varsayılan lokasyon: AppData/Fatrocu/models/<filename>
-            let (_, filename) = gemma_model_info(&settings.extraction_model_id);
-            if let Some(data_dir) = dirs::data_dir() {
-                let p = data_dir
-                    .join("Fatrocu")
-                    .join("models")
-                    .join(filename);
+        if settings.extraction_model_id == "custom" {
+            if !settings.extraction_model_path.is_empty() {
+                let p = PathBuf::from(&settings.extraction_model_path);
                 if p.exists() {
                     return Some(p);
                 }
-                // Alternatif: doğrudan extraction_model_path'e bak
-                return if settings.extraction_model_path.is_empty() {
-                    None
-                } else {
-                    let ep = PathBuf::from(&settings.extraction_model_path);
-                    if ep.exists() { Some(ep) } else { None }
-                };
             }
             return None;
-        };
-
-        if path_str.is_empty() {
-            None
-        } else {
-            let p = PathBuf::from(&path_str);
-            if p.exists() { Some(p) } else { None }
         }
+
+        if !settings.extraction_model_path.is_empty() {
+            let ep = PathBuf::from(&settings.extraction_model_path);
+            if ep.exists() {
+                return Some(ep);
+            }
+        }
+
+        // Varsayılan dosya adına göre ara
+        let (_, filename) = gemma_model_info(&settings.extraction_model_id);
+        if let Some(data_dir) = dirs::data_dir() {
+            let p = data_dir.join("Fatrocu").join("models").join(filename);
+            if p.exists() {
+                return Some(p);
+            }
+        }
+
+        // Otomatik arama: gemma model id'sine göre (e4b, e2b, 12b) veya genel gemma
+        let pattern = match settings.extraction_model_id.as_str() {
+            "E2B" => "e2b",
+            "12B" => "12b",
+            _ => "e4b",
+        };
+        if let Some(p) = Self::find_existing_file_by_name(pattern) {
+            return Some(p);
+        }
+        if let Some(p) = Self::find_existing_file_by_name("gemma") {
+            return Some(p);
+        }
+
+        None
     }
 
     /// Motorun durumunu kontrol et

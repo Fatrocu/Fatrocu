@@ -34,6 +34,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [isDraggingModel, setIsDraggingModel] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Settings prop değiştiğinde yerel state'i güncelle
+  React.useEffect(() => {
+    setLocal(settings);
+  }, [settings]);
+
+  React.useEffect(() => {
+    setLocalConfigs(configs);
+  }, [configs]);
+
   const handleAutoInstallEngine = async () => {
     setIsInstallingEngine(true);
     setInstallMessage('llama.cpp motoru GitHub üzerinden indiriliyor ve kuruluyor...');
@@ -55,15 +64,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       const updated = await tauriService.getAppSettings();
       if (updated) {
         setLocal(updated);
-        onSaveSettings(updated);
+        await onSaveSettings(updated);
       }
     } catch (err) {
       setImportMessage(`Hata: ${err}`);
     }
   };
 
-  const set = <K extends keyof AppSettings>(k: K, v: AppSettings[K]) =>
-    setLocal((p) => ({ ...p, [k]: v }));
+  const set = <K extends keyof AppSettings>(k: K, v: AppSettings[K]) => {
+    setLocal((p) => {
+      const next = { ...p, [k]: v };
+      // Değişikliği anında üst bileşene ve arka plana bildir (sayfa değişince kaybolmasın)
+      onSaveSettings(next);
+      return next;
+    });
+  };
 
   const save = async () => {
     await onSaveSettings(local);

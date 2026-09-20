@@ -353,27 +353,42 @@ pub async fn auto_install_llama_engine() -> Result<String, String> {
         .join("bin");
     std::fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
 
-    // CPU tabanlı standart Windows build zip URL
-    let download_url = "https://github.com/ggerganov/llama.cpp/releases/download/b4850/llama-b4850-bin-win-cpu-x64.zip";
+    // GitHub llama.cpp en güncel kararlı release linkleri (önce b11063, ardından b11062 fallback)
+    let candidate_urls = [
+        "https://github.com/ggerganov/llama.cpp/releases/download/b11063/llama-b11063-bin-win-cpu-x64.zip",
+        "https://github.com/ggerganov/llama.cpp/releases/download/b11062/llama-b11062-bin-win-cpu-x64.zip",
+        "https://github.com/ggerganov/llama.cpp/releases/download/b4850/llama-b4850-bin-win-cpu-x64.zip",
+    ];
 
     let client = reqwest::Client::builder()
-        .user_agent("Fatrocu-Desktop/3.0")
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Fatrocu/3.0")
         .timeout(std::time::Duration::from_secs(180))
         .build()
         .map_err(|e| e.to_string())?;
 
-    let response = client
-        .get(download_url)
-        .send()
-        .await
-        .map_err(|e| format!("İndirme isteği başarısız: {}", e))?;
+    let mut response_opt = None;
+    let mut last_err = String::new();
 
-    if !response.status().is_success() {
-        return Err(format!(
-            "llama.cpp indirme sunucusu hata verdi: HTTP {}",
-            response.status()
-        ));
+    for url in candidate_urls {
+        info!("llama.cpp indiriliyor: {}", url);
+        match client.get(url).send().await {
+            Ok(resp) => {
+                if resp.status().is_success() {
+                    response_opt = Some(resp);
+                    break;
+                } else {
+                    last_err = format!("HTTP {}", resp.status());
+                }
+            }
+            Err(e) => {
+                last_err = e.to_string();
+            }
+        }
     }
+
+    let response = response_opt.ok_or_else(|| {
+        format!("llama.cpp indirme bağlantıları başarısız oldu: {}. Lütfen internet bağlantınızı kontrol edin.", last_err)
+    })?;
 
     let bytes = response
         .bytes()
