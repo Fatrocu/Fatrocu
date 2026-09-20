@@ -195,6 +195,21 @@ class TauriService {
     return await invoke<string>('get_models_dir');
   }
 
+  async openModelsFolder(): Promise<void> {
+    if (!IS_TAURI) return;
+    await invoke('open_models_folder');
+  }
+
+  async importModelFile(sourcePath: string): Promise<string> {
+    if (!IS_TAURI) return 'Web modunda model ekleme desteklenmez.';
+    return await invoke<string>('import_model_file', { sourcePath });
+  }
+
+  async autoInstallLlamaEngine(): Promise<string> {
+    if (!IS_TAURI) return 'Web modunda motor kurulumu desteklenmez.';
+    return await invoke<string>('auto_install_llama_engine');
+  }
+
   async checkModelExists(filePath: string): Promise<boolean> {
     if (!IS_TAURI) return false;
     return await invoke<boolean>('check_model_exists', { filePath });

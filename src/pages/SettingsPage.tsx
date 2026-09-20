@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AppSettings, InvoiceConfig, ModelStatus, FieldConfig, GemmaVariant } from '../types';
-import { Plus, Trash2, ChevronDown, Info, Cpu, HardDrive, Sliders, CheckCircle2, Bookmark } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, Info, Cpu, HardDrive, Sliders, CheckCircle2, Bookmark, UploadCloud, FolderOpen, Download, RefreshCw, Zap } from 'lucide-react';
+import { tauriService } from '../services/tauriService';
 
 interface SettingsPageProps {
   settings: AppSettings;
@@ -27,6 +28,39 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [section, setSection] = useState<Section>('models');
   const [editConfigIdx, setEditConfigIdx] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
+  const [isInstallingEngine, setIsInstallingEngine] = useState(false);
+  const [installMessage, setInstallMessage] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [isDraggingModel, setIsDraggingModel] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAutoInstallEngine = async () => {
+    setIsInstallingEngine(true);
+    setInstallMessage('llama.cpp motoru GitHub üzerinden indiriliyor ve kuruluyor...');
+    try {
+      const msg = await tauriService.autoInstallLlamaEngine();
+      setInstallMessage(`✓ ${msg}`);
+    } catch (err) {
+      setInstallMessage(`Hata: ${err}`);
+    } finally {
+      setIsInstallingEngine(false);
+    }
+  };
+
+  const handleImportModelPath = async (filePath: string) => {
+    try {
+      const res = await tauriService.importModelFile(filePath);
+      setImportMessage(`✓ ${res}`);
+      // Güncel ayarları tekrar çek
+      const updated = await tauriService.getAppSettings();
+      if (updated) {
+        setLocal(updated);
+        onSaveSettings(updated);
+      }
+    } catch (err) {
+      setImportMessage(`Hata: ${err}`);
+    }
+  };
 
   const set = <K extends keyof AppSettings>(k: K, v: AppSettings[K]) =>
     setLocal((p) => ({ ...p, [k]: v }));
@@ -117,6 +151,107 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       {section === 'models' && (
         <div className="space-y-6">
           
+          {/* Quick Automation Hub: Engine & Model Importer */}
+          <div className="scribble-card p-6 bg-white border-2 border-black space-y-5 shadow-[5px_5px_0px_#000]">
+            <div className="flex items-center justify-between pb-3 border-b-2 border-black">
+              <div className="flex items-center gap-2">
+                <Zap size={22} className="text-black stroke-[3]" />
+                <h3 className="font-heading font-black text-lg text-black uppercase tracking-wider">
+                  Otomatik Kurulum &amp; Model Sürükle-Bırak
+                </h3>
+              </div>
+              <button
+                onClick={() => tauriService.openModelsFolder()}
+                className="scribble-btn scribble-btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-[1.5px_1.5px_0px_#000]"
+                title="AppData altındaki models klasörünü aç"
+              >
+                <FolderOpen size={14} className="stroke-[2.5]" />
+                <span>Modeller Klasörünü Aç</span>
+              </button>
+            </div>
+
+            {/* Quick Engine installer */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border-2 border-black bg-neutral-50 shadow-[2px_2px_0px_#000]">
+              <div className="space-y-0.5">
+                <span className="font-heading font-black text-sm text-black block">
+                  1. llama.cpp Motorunu Otomatik Kur
+                </span>
+                <span className="font-scribble text-xs text-neutral-600 font-bold block">
+                  Gereken llama-cli.exe ve DLL dosyalarını tek tıkla indirip ayarlar.
+                </span>
+                {installMessage && (
+                  <span className="font-heading font-bold text-xs text-black block mt-1">
+                    {installMessage}
+                  </span>
+                )}
+              </div>
+
+              <button
+                onClick={handleAutoInstallEngine}
+                disabled={isInstallingEngine}
+                className={`scribble-btn px-4 py-2 text-xs flex items-center gap-2 shrink-0 ${
+                  isInstallingEngine ? 'opacity-50 cursor-not-allowed' : 'scribble-btn-primary'
+                }`}
+              >
+                {isInstallingEngine ? (
+                  <RefreshCw size={14} className="animate-spin stroke-[2.5]" />
+                ) : (
+                  <Download size={14} className="stroke-[2.5]" />
+                )}
+                <span>{isInstallingEngine ? 'Kuruluyor...' : 'Motoru Tek Tıkla Kur'}</span>
+              </button>
+            </div>
+
+            {/* Drag & Drop GGUF Zone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDraggingModel(true); }}
+              onDragLeave={() => setIsDraggingModel(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDraggingModel(false);
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                  // Tauri'de sürüklenen dosyanın absolute path'i alınır
+                  const filePath = (files[0] as any).path || files[0].name;
+                  handleImportModelPath(filePath);
+                }
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-[2.5px] border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                isDraggingModel
+                  ? 'border-black bg-neutral-100 shadow-[4px_4px_0px_#000]'
+                  : 'border-black/60 bg-white hover:border-black shadow-[2px_2px_0px_#000]'
+              }`}
+            >
+              <UploadCloud size={32} className="mx-auto text-black stroke-[2] mb-1.5" />
+              <h4 className="font-heading font-black text-sm text-black">
+                GGUF Model Dosyasını (.gguf) Buraya Sürükleyip Bırakın
+              </h4>
+              <p className="font-scribble text-xs text-neutral-600 font-bold mt-0.5">
+                DeepSeek-OCR veya Gemma 4 GGUF dosyanızı bıraktığınızda otomatik tanınıp klasöre kopyalanır.
+              </p>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".gguf"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    const path = (e.target.files[0] as any).path;
+                    if (path) handleImportModelPath(path);
+                  }
+                }}
+              />
+            </div>
+
+            {importMessage && (
+              <div className="p-3 bg-neutral-100 border-2 border-black rounded-lg font-heading font-bold text-xs text-black">
+                {importMessage}
+              </div>
+            )}
+          </div>
+
           {/* Architecture notice card */}
           <div className="scribble-card p-5 bg-white border-2 border-black flex items-start gap-4">
             <div className="w-10 h-10 rounded-xl border-2 border-black bg-neutral-100 flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">

@@ -271,6 +271,148 @@ pub async fn get_models_dir() -> Result<String, String> {
     Ok(dir.to_string_lossy().to_string())
 }
 
+/// Modeller klasörünü Windows Gezgini'nde açar
+#[tauri::command]
+pub async fn open_models_folder() -> Result<(), String> {
+    let dir = dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("Fatrocu")
+        .join("models");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    open::that(&dir).map_err(|e| e.to_string())
+}
+
+/// Sürükleyip bırakılan veya dosya seçiciyle seçilen bir modeli otomatik algılayıp modeller klasörüne kopyalar ve ayarları günceller
+#[tauri::command]
+pub async fn import_model_file(
+    source_path: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let src = PathBuf::from(&source_path);
+    if !src.exists() {
+        return Err(format!("Dosya bulunamadı: {}", source_path));
+    }
+
+    let file_name = src
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Geçersiz dosya adı".to_string())?;
+
+    let lower_name = file_name.to_lowercase();
+    let models_dir = dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("Fatrocu")
+        .join("models");
+    std::fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
+
+    let dest = models_dir.join(file_name);
+
+    // Aynı dosyaysa kopyalamaya gerek yok
+    if src != dest {
+        std::fs::copy(&src, &dest)
+            .map_err(|e| format!("Model kopyalama hatası: {}", e))?;
+    }
+
+    let dest_str = dest.to_string_lossy().to_string();
+
+    // Modelin tipini dosya adından otomatik tanı
+    let storage = state.storage.lock().map_err(|e| e.to_string())?;
+    let mut settings = storage.load_settings();
+
+    let recognized_type = if lower_name.contains("deepseek") || lower_name.contains("ocr") {
+        settings.ocr_model_path = dest_str.clone();
+        "DeepSeek-OCR Modeli olarak algılandı ve ayarlandı."
+    } else if lower_name.contains("gemma") {
+        if lower_name.contains("e2b") || lower_name.contains("2b") {
+            settings.extraction_model_id = "E2B".to_string();
+        } else if lower_name.contains("12b") {
+            settings.extraction_model_id = "12B".to_string();
+        } else {
+            settings.extraction_model_id = "E4B".to_string();
+        }
+        settings.extraction_model_path = dest_str.clone();
+        "Gemma 4 Alan Çıkarma Modeli olarak algılandı ve ayarlandı."
+    } else {
+        settings.extraction_model_id = "custom".to_string();
+        settings.extraction_model_path = dest_str.clone();
+        "Özel GGUF Modeli olarak algılandı ve ayarlandı."
+    };
+
+    storage.save_settings(&settings)?;
+    Ok(format!("{}: {}", recognized_type, file_name))
+}
+
+/// llama-cli motorunu GitHub release'inden tek tıkla otomatik indirip kurar
+#[tauri::command]
+pub async fn auto_install_llama_engine() -> Result<String, String> {
+    info!("Otomatik llama.cpp motor indirme başlatılıyor...");
+
+    let bin_dir = dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("Fatrocu")
+        .join("bin");
+    std::fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
+
+    // CPU tabanlı standart Windows build zip URL
+    let download_url = "https://github.com/ggerganov/llama.cpp/releases/download/b4850/llama-b4850-bin-win-cpu-x64.zip";
+
+    let client = reqwest::Client::builder()
+        .user_agent("Fatrocu-Desktop/3.0")
+        .timeout(std::time::Duration::from_secs(180))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let response = client
+        .get(download_url)
+        .send()
+        .await
+        .map_err(|e| format!("İndirme isteği başarısız: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "llama.cpp indirme sunucusu hata verdi: HTTP {}",
+            response.status()
+        ));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Veri akışı okunamadı: {}", e))?;
+
+    let reader = std::io::Cursor::new(bytes);
+    let mut archive = zip::ZipArchive::new(reader)
+        .map_err(|e| format!("Zip dosyası açılamadı: {}", e))?;
+
+    let mut extracted_count = 0;
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let file_name = match file.enclosed_name() {
+            Some(path) => path.to_owned(),
+            None => continue,
+        };
+
+        let file_name_str = file_name.to_string_lossy().to_string();
+        // Sadece llama-cli.exe ve gerekli dll dosyalarını çıkart
+        if file_name_str.ends_with(".exe") || file_name_str.ends_with(".dll") {
+            let outpath = bin_dir.join(file_name.file_name().unwrap_or(file_name.as_os_str()));
+            if file.is_file() {
+                let mut outfile = std::fs::File::create(&outpath)
+                    .map_err(|e| format!("Dosya yazılamadı: {}", e))?;
+                std::io::copy(&mut file, &mut outfile)
+                    .map_err(|e| format!("Dosya çıkartılamadı: {}", e))?;
+                extracted_count += 1;
+            }
+        }
+    }
+
+    Ok(format!(
+        "llama.cpp motoru başarıyla kuruldu! ({} dosya çıkartıldı: {})",
+        extracted_count,
+        bin_dir.display()
+    ))
+}
+
 /// Belirli bir model dosyasının var olup olmadığını kontrol et
 #[tauri::command]
 pub async fn check_model_exists(file_path: String) -> bool {

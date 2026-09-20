@@ -46,6 +46,9 @@ pub fn run() {
             reveal_in_explorer,
             open_path,
             get_models_dir,
+            open_models_folder,
+            import_model_file,
+            auto_install_llama_engine,
             check_model_exists,
         ])
         .run(tauri::generate_context!())

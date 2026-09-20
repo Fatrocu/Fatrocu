@@ -60,7 +60,7 @@ impl LlamaEngine {
             }
         }
 
-        // 2. Uygulama dizininde mi?
+        // 2. Uygulama dizininde veya bin/ alt klasöründe mi?
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
                 for name in &candidates {
@@ -68,6 +68,21 @@ impl LlamaEngine {
                     if p.exists() {
                         return Some(p);
                     }
+                    let bin_p = exe_dir.join("bin").join(name);
+                    if bin_p.exists() {
+                        return Some(bin_p);
+                    }
+                }
+            }
+        }
+
+        // 3. %APPDATA%\Fatrocu\bin dizininde mi?
+        if let Some(data_dir) = dirs::data_dir() {
+            let app_bin = data_dir.join("Fatrocu").join("bin");
+            for name in &candidates {
+                let p = app_bin.join(name);
+                if p.exists() {
+                    return Some(p);
                 }
             }
         }
