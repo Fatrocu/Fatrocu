@@ -1,50 +1,10 @@
-# Models / Heavy Binaries (HuggingFace'den indirilir veya release_assets kullanılır)
-gguf/
-*.gguf
-*.bin
-
-# Release çıktıları / Paketler
-/release_assets/
-*.exe
-*.msi
-*.zip
-*.tar.gz
-
-# Node
-node_modules/
-dist/
-.vite/
-npm-debug.log*
-
-# Rust & Tauri
-target/
-src-tauri/target/
+/target/
 **/*.rs.bk
-Cargo.lock
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-env/
-venv/
-*.egg-info/
-.pytest_cache/
-*.log
-
-# Windows / OS
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-.DS_Store
-
-# User AppData / Cache / Temp
-*.tmp
-*.temp
-DOCS_SUMMARY.md
-
-
-
-.pi/
+/.env
+*.gguf
+*.exe
+*.dll
+*.zip
+*.msi
+/private-data/
+/benchmark-results/

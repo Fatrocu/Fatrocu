@@ -1,0 +1,33 @@
+name: Native Windows checks
+on:
+  pull_request:
+  push:
+    branches: ['codex/**']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: Fatrocu
+      - name: Read dependency revisions
+        shell: pwsh
+        run: |
+          "CORE_REVISION=$(Get-Content Fatrocu/core-revision.txt)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "SERVER_REVISION=$(Get-Content Fatrocu/server-revision.txt)" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - uses: actions/checkout@v4
+        with:
+          repository: Fatrocu/fatrocu-cli
+          ref: ${{ env.CORE_REVISION }}
+          path: fatrocu-cli
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+        working-directory: Fatrocu
+      - run: cargo test --locked --all-targets
+        working-directory: Fatrocu
+      - run: cargo clippy --locked --all-targets -- -D warnings
+        working-directory: Fatrocu
