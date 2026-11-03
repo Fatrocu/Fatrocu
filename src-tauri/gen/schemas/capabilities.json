@@ -1,1 +1,0 @@
-{"default":{"identifier":"default","description":"Default capabilities for Fatrocu","local":true,"windows":["main"],"permissions":["core:default","opener:default","dialog:default","fs:default"]}}

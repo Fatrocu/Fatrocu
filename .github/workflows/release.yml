@@ -1,54 +1,39 @@
-name: Release Windows App
-
+name: Build Windows release candidate
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
-
+permissions:
+  contents: read
 jobs:
-  release:
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'windows-latest'
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
+  build:
+    runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+          path: Fatrocu
+      - name: Read dependency revisions
+        shell: pwsh
+        run: |
+          "CORE_REVISION=$(Get-Content Fatrocu/core-revision.txt)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "SERVER_REVISION=$(Get-Content Fatrocu/server-revision.txt)" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - uses: actions/checkout@v4
         with:
-          targets: x86_64-pc-windows-msvc
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+          repository: Fatrocu/fatrocu-cli
+          ref: ${{ env.CORE_REVISION }}
+          path: fatrocu-cli
+      - uses: actions/checkout@v4
         with:
-          workspaces: './src-tauri -> target'
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Build Desktop Application (Tauri)
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          repository: Fatrocu/fatrocu-server
+          ref: ${{ env.SERVER_REVISION }}
+          path: fatrocu-server
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked --release --manifest-path fatrocu-cli/Cargo.toml
+      - run: cargo build --locked --release --manifest-path fatrocu-server/Cargo.toml
+      - run: cargo build --locked --release --manifest-path Fatrocu/Cargo.toml
+      - uses: actions/upload-artifact@v4
         with:
-          tagName: v__VERSION__
-          releaseName: 'Fatrocu v__VERSION__'
-          releaseBody: 'Fatrocu v__VERSION__ - Native Windows App powered by Rust & NaviDC-OCR'
-          releaseDraft: false
-          prerelease: false
-          args: ${{ matrix.args }}
+          name: unsigned-windows-candidate
+          path: |
+            Fatrocu/target/release/fatrocu.exe
+            fatrocu-cli/target/release/fatrocu-updater.exe
+            fatrocu-server/target/release/fatrocu-server.exe
+# Publisher signing, private accuracy gates and stable release publication remain manual.
