@@ -1,6 +1,8 @@
-name: Build Windows release candidate
+name: Build unsigned Windows beta candidate
 on:
   workflow_dispatch:
+  push:
+    branches: ['codex/release-3.1.0-beta.1']
 permissions:
   contents: read
 jobs:
@@ -29,11 +31,11 @@ jobs:
       - run: cargo build --locked --release --manifest-path fatrocu-cli/Cargo.toml
       - run: cargo build --locked --release --manifest-path fatrocu-server/Cargo.toml
       - run: cargo build --locked --release --manifest-path Fatrocu/Cargo.toml
+      - name: Package unsigned Windows beta with pinned companions
+        run: python fatrocu-cli/scripts/package-beta.py --product desktop --root Fatrocu --output "${{ runner.temp }}/beta-dist"
       - uses: actions/upload-artifact@v4
         with:
-          name: unsigned-windows-candidate
-          path: |
-            Fatrocu/target/release/fatrocu.exe
-            fatrocu-cli/target/release/fatrocu-updater.exe
-            fatrocu-server/target/release/fatrocu-server.exe
-# Publisher signing, private accuracy gates and stable release publication remain manual.
+          name: beta-fatrocu-desktop-windows
+          path: ${{ runner.temp }}/beta-dist/*
+          if-no-files-found: error
+# This is an unsigned manual-test beta, never an authenticated production update.
